@@ -1,0 +1,2534 @@
+---
+title: "Tesina Adrián Sandoval Cordero"
+author: "Adrián Sandoval"
+date: "2025-06-02"
+output: pdf_document
+lang: Es-es
+fig_width: 4 
+fig_height: 3 
+---
+\tableofcontents 
+\newpage
+\listoffigures
+\newpage
+\listoftables
+\newpage
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, fig.height=3, fig.width=4)
+library(data.table)
+library(ggplot2)
+library(MASS)
+library(rpart)
+library(psych)
+library(rpart.plot)
+library(ModelMetrics)
+library(ipred)
+library(randomForest)
+library(xgboost)
+library(plotly)
+library(fastDummies)
+library(nortest)
+library(lmtest)
+library(car)
+library(rstatix)
+library(qqconf)
+library(jtools)
+library(stargazer)
+library(rcompanion)
+library(ggpubr)
+library(cowplot)
+library(caret)
+library(corrplot)
+library(bookdown)
+library(DiagrammeR)
+library(DiagrammeRsvg)
+library(rsvg)
+library(patchwork)
+
+benchmark_original_dt <- as.data.table(read.csv("C:/Users/klaym/OneDrive/Documentos/Especialidad Estadística Aplicada 2021/Tesina/base_tesina.csv"))
+
+#qua_q_99 <- quantile(benchmark_original_dt$QUA_Desc_Num, probs = seq(0, 1, by= 0.0001))[9999]
+#zurich_q_99 <- quantile(benchmark_original_dt$Zurich_Desc_Num, probs = seq(0, 1, by= 0.0001))[9999]
+
+
+#benchmark_original_dt[,`:=`(QUA_Desc_Num = fifelse(QUA_Desc_Num > qua_q_99, qua_q_99, QUA_Desc_Num),
+#                            Zurich_Desc_Num = fifelse(Zurich_Desc_Num > zurich_q_99, zurich_q_99, Zurich_Desc_Num))]
+set.seed(123)
+benchmark_model <- benchmark_original_dt
+
+
+# Base final
+benchmark_model[,`:=`(Log_QUA_Desc_Num = log(QUA_Desc_Num),
+                      QUA_Desc_Num_sqrt = sqrt(QUA_Desc_Num),
+                      Log_Siniestro_SA = log(SA_siniestro),
+                      Log_Siniestro_SA_2 = log(SA_siniestro) ^ 2,
+                      Log_Siniestro_SA_3 = log(SA_siniestro) ^ 3,
+                      Log_Siniestro_SA_4 = log(SA_siniestro) ^ 4,
+                      Log_Siniestro_SA_5 = log(SA_siniestro) ^ 5,
+                      Log_Siniestro_SA_6 = log(SA_siniestro) ^ 6,
+                      Log_Siniestro_SA_7 = log(SA_siniestro) ^ 7,
+                      Log_Siniestro_SA_8 = log(SA_siniestro) ^ 8,
+                      Siniestro_SA_2 = SA_siniestro ^ 2,
+                      Siniestro_SA_3 = SA_siniestro ^ 3,
+                      Siniestro_SA_4 = SA_siniestro ^ 4,
+                      Siniestro_SA_5 = SA_siniestro ^ 5,
+                      Siniestro_SA_6 = SA_siniestro ^ 6,
+                      Siniestro_SA_7 = SA_siniestro ^ 7,
+                      Siniestro_SA_8 = SA_siniestro ^ 8,
+                      SA_siniestro_sqrt = sqrt(SA_siniestro),
+                      Edad_Num = as.numeric(Edad),
+                      Edad_Num_2 = as.numeric(Edad) ^ 2,
+                      Atizapan_Zaragoza = fifelse(Municipio_D == "ATIZAPAN DE ZARAGOZA", 1, 0),
+                      Atiz_Izt_GAM = fifelse(Municipio_D %in% c("ZAPOPAN", "ATIZAPÁN DE ZARAGOZA", "GUADALAJARA", 
+                                                                "NAUCALPAN DE JUAREZ", "TOLUCA", "MORELIA"), 1, 0) ,
+                      Pasajeros_5 = {
+                        fifelse(as.numeric(Pasajeros) == 5, 1, 0)  
+                      },
+                      Edad_Cat = {
+                        fifelse(as.numeric(Edad) <= 28, "Joven",
+                                fifelse(as.numeric(Edad) < 66,"Mediana","Viejo"))
+                      },
+                      Carroceria_R = {fifelse(Carroceria %in% c("CONV", "CHASIS CABINA", "COUPE", 
+                                                                "ESTACAS", "PANEL", "SW", "WAGON", "MINIVAN", "VAN",                                                                        "PICKUP"),"OTROS", Carroceria)
+                        },
+                      Marca_TP_R = {fifelse(Marca_TP %in% c("AUDI", "GMC", "COUPE", "MERCEDES BENZ",
+                                                            "GMC", "INFINITI", "VOLVO", "DODGE", "CHEVROLET", "PORSCHE", "JEEP",
+                                                            "BUICK", "CADILLAC", "DODGE", "TOYOTA", "BMW"),"GRUPO 1", "GRUPO_2")
+                      })]
+
+`%!in%` = function(x, y) !(x%in%y)
+
+benchmark_model <- benchmark_model[Estado %!in% c("Baja California Sur", "Campeche", "Guerrero", 
+                                                  "Durango", "Tlaxcala", "Zacatecas", "Tamaulipas",
+                                                  "Oaxaca", "Hidalgo","Baja California", "Colima")]
+
+#nrow(benchmark_model)
+```
+
+# 1. Introducción
+
+El objetivo de este trabajo es comparar el desempeño predictivo de modelos tradicionales, como la Regresión Lineal y la regresión Lineal Generalizada, frente a una metodología de Machine Learning, en particular el modelo de Gradient Boosting Machine (GBM). Se seleccionó un problema del sector de seguros de daños ya que muchas de las variables que se manejan en este campo (como la suma asegurada, el tipo de vehículo, la antiguedad del vehículo etc.) son variables principalmente categóricas o que no tienen un comportamiento tradicional que hacen necesario el uso de modelos más allá del Modelo Lineal clásico, o los pertenecientes a la familia exponencial como los Modelos Lineales Generalizados. Esto motiva la exploración de enfoques más flexibles como GBM, que pueden capturar relaciones no lineales y complejas entre las variables.
+
+El problema seleccionado consiste en predecir el precio del seguro de automóvil con cobertura amplia para una compañía aseguradora, utilizando como base las características del vehículo y la información del propietario. Este tipo de estimación es de gran relevancia para las aseguradoras, ya que al comprender cómo otras compañías podrían establecer sus precios permite fijar tarifas más justas y competitivas, lo que puede traducirse en una mejor posición en el mercado.
+
+Además, este trabajo usa el enfoque comúnmente utilizado en Ciencia de Datos para el desarrollo de modelos estadísticos. Donde el proceso inicia con la selección del problema a resolver, seguido del preprocesamiento y ajuste de los datos. Posteriormente, se elige la el modelo adecuado, se valida el modelo y, finalmente, se selecciona aquel que ofrezca el mejor desempeño predictivo.
+
+Adicionalmente, se hace una breve introducción teórica a los tres modelos usados en el trabajo:
+
++ Regresión Lineal
++ Regresión Gamma
++ XGradient Boosting (variación de GBM)
+
+Los primeros modelos son tradicionales en el área de los seguros, y el último es una técnica de Machine Learning que se popularizó a mediados de la década del 2010.
+
+Adicionalmente, se explica la necesidad de poder hacer una predicción sobre los precios de seguros de automóvil con cobertura amplia obtenidos de una compañía de seguros.
+
+Para la validación y comparación de modelos se decidió dividir los datos en dos partes: una donde se entrenarán los modelos, y la otra se validarán los resultados. Además, se seleccionan algunas métricas de validación para poder comparar de manera justa los modelos, y poder determinar de manera estadística cual es la que ofrece mejores predicciones. Las métricas de validación vienen acompañadas de una gráfica que muestra la predicción por modelo y por variables para poder visualizar cual obtuvo el mejor ajuste comparando contra el precio real del seguro de automóvil. Adicionalmente, se hace un gráfico de cuantiles que permite hacer una comparación directa entre cada modelo. Cada estimación de los modelos viene acompañada de un análisis de residuos, un análisis de permanencia de variables, una transformación logarítmica de variable objetivo, y una comparativa entre coeficientes de información para asegurar que se obtuvo el resultado superior por cada metodología.
+
+Finalmente, se concluye que la ténica de Machine Learning ofrece estimaciones más precisas basadas en las métricas presentadas, análisis de residuos y el análisis visual. 
+
+\newpage
+
+# 2. Modelos Lineales
+
+El Modelo Lineal y el Modelo Lineal Generalizado son técnicas estadísticas que han sido usadas en la industria de los seguros por muchos años ya que ofrecen beneficios como:
+
++ Tener extensa bibliografía
++ Los resultados son interpretables
++ La estimación de parámetros está implementada en diversos programas
++ Es posible analizar inferencias
+
+El capítulo se enfocará en dar una breve descripción de ambos modelos.
+
+## 2.1 Modelo Lineal
+
+El Modelo Lineal tiene como objetivo estimar el valor esperado de una variable $Y$, conocida como variable objetivo, utilizando un conjunto de variables $X$, denominadas variables explicativas o independientes. El modelo se expresa de la siguiente manera:
+
+$$
+Y=\beta_{0}+\beta_{1}X_{1}+...+\beta_{n}X_{n}+\epsilon ,
+$$
+donde $\epsilon\sim N(0,\sigma^2)$. 
+
+Adicionalmente, este modelo se puede describir de manera matricial como sigue:
+
+$$
+\mathbf{Y} = \mathbf{X} \boldsymbol{\beta} + \boldsymbol{\varepsilon}
+$$
+Donde:
+
++ $\mathbf{Y} \in \mathbb{R}^{n \times 1}$ es el vector de la variable respuesta observado
++ $\mathbf{X} \in \mathbb{R}^{n \times p}$ es la matríz de variables independientes
++ $\boldsymbol{\beta} \in \mathbb{R}^{p \times 1}$ es el vector de coeficientes
++ $\boldsymbol{\varepsilon} \in \mathbb{R}^{n \times 1}$ es el vector de residuos
+
+La estimacón de los parámetros, $\beta=(\beta_1,...\beta_n)$, se hace minimizando la suma de residuos cuadrados (SCR) observados.
+
+$$
+ SRC =\sum_{i=1}^n (y_i - \hat{y}_i)^2 = \sum_{i=1}^n (y_i - \mathbf{X}_i^T \boldsymbol{\beta})^2
+$$
+
+La cual se expresa de manera matricial como:
+
+$$
+(\mathbf{Y} - \mathbf{X} \boldsymbol{\beta})^T (\mathbf{Y} - \mathbf{X} \boldsymbol{\beta})
+$$
+Para encontrar los coeficientes se deben tomar las derivadas con respecto a $\boldsymbol{\beta}$ y se iguala a 0.
+
+$$
+\frac{\partial}{\partial \boldsymbol{\beta}} (\mathbf{y} - \mathbf{X} \boldsymbol{\beta})^T (\mathbf{y} - \mathbf{X} \boldsymbol{\beta}) = -2 \mathbf{X}^T (\mathbf{y} - \mathbf{X} \boldsymbol{\beta}) = 0
+$$
+Resolviendo la ecuación anterior tenemos.
+
+$$
+\hat{\boldsymbol{\beta}} = (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \mathbf{Y}
+$$
+Esta estimación de coeficientes se conoce como Mínimos Cuadrados Ordinarios (MCO). Para que los coeficientes estimados sean consistentes (es decir, que converjan en probabilidad al valor verdadero a medida que aumenta el tamaño de la muestra), insesgados, tengan varianza mínima y sigan una distribución normal, es necesario que se cumplan los siguientes supuestos:
+
++ $(\mathbf{X}^T \mathbf{X})$ es invertible (no existe multicolinealidad perfecta)
++ Independencia entre los errores
++ Homocedasticidad (varianza constante de los errores)
++ Los residuos $\boldsymbol{\varepsilon}$ tienen distribución Normal con media 0, y son independientes de las variables en $X$
+
+Una vez hecha la estimación del modelo se necesita verificar que se cumplen todos los supuestos. Esto se puede hacer en $R$ llamando la función $plot$ sobre el modelo estimado, y calcula 4 gráficos que permiten verificar visualmente si los residuos tienen una distribución Normal, si los residuos tienen varianza constante, si los residuos son independientes de las variables independientes, y la existencia de valores outliers que esten influenciando la estimación. Esto último se hace con el cálculo de la distancia de Cook que es una medida que evalúa la influencia de una observación en un modelo de regresión definida como:
+
+$$
+D_i = D_i = \frac{r_i^2}{p \cdot (1 - h_{ii})} \times h_{ii}
+$$
+
+Donde:
+
+- $r_i$ es el residuo estandarizado, que son los residuos del modelo divididos por una estimación de su desviación estándar, considerando el leverage de cada observación.
+- $h_{ii}$ es el leverage (elemento diagonal de la $(\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T$).
+- $p$ es el número de parámetros del modelo (incluyendo intercepto).
+
+Finalmente, se hacen uso de la distribución $t$ para poder crear diseñar una prueba de hipótesis que permite identificar si una variable independiente es estadísticamente significativa dentro del modelo es decir $H0:\beta_i=0$ para el coeficiente de alguna variable $i$.
+
+
+## 2.2 Modelo Lineal Generalizado
+
+El Modelo Lineal Generalizado se considera una extensión del Modelo Lineal y se representa de la siguiente forma:
+
+$$
+\mathbb{E}[Y|X_{1}=x_{1},...,X_{n}=x_{n}]=g(\beta_{0}+\beta_{1}x_{1}+...+\beta_{n}x_{n})
+$$
+La función $g$ se llama función liga, y tiene que ser inyectiva así como creciente (o decreciente). Además, la variable $Y$ tiene una distribución que pertenece a la familia exponencial. Se dice que la variable aleatoria $Y$ pertenece a la familia exponencial si se puede expresar de la siguiente forma:
+
+$$
+f_Y(y; \theta, \phi) = c(y, \phi)\exp\left( \frac{y \cdot \theta - a(\theta)}{\phi}\right)
+$$
+
+Donde $\theta$ y $\phi$ son parámetros.
+
+Una de las características de las distribuciones que pertenecen a esta familia es que su esperanza y varianza se pueden caracterizar de la siguiente forma:
+
+$$
+  \mathbb{E}[Y] = a'(\theta)
+$$
+$$
+  \mathrm{Var}(Y) = \phi \cdot a''(\theta)
+$$
+La siguiente tabla muestra algunas de las distribuciones que pertenecen a la familia exponencial:
+
+
+| Distribución| $\theta$| $a(\theta)$| $\phi$       |
+|:----------:|:--------:|:----------:|:------------:|
+| Normal|$\mu$|$\frac{1}{2} \mu^2$ | $\sigma^2$  |
+| Bernoulli|$\ln\left(\frac{p}{1 - p}\right)$| $n\ln(1 + e^\theta)$|1|
+| Poisson|$\ln(\lambda)$| $e^\theta$| 1 |
+| Gamma|$-\lambda$|$-\ln(-\theta)$| $\frac{1}{v}$|
+Table: Ejemplos de la Familia Exponencial
+
+A diferencia de la regresión lineal, en este caso no existe una fórmula cerrada para estimar los parámetros mediante el método de Mínimos Cuadrados Ordinarios (MCO). Por ello, se recurre a la maximización de la log-verosimilitud para obtener las estimaciones.
+
+$$
+\ell(\boldsymbol{\beta}, \phi) = \sum_{i=1}^n\frac{(y_i \theta_i - a(\theta_i))}{\phi}+ c(y_i, \phi)
+$$
+
+
+La función anterior se puede maximizar usando algoritmos iterativos como el método de Newton-Raphson, Fisher Scoring, o la metodología de Mínimos Cuadrados Ponderados Iterados. La función $glm$ de la paquetería $stats$ usa el método de Mínimos Cuadrasod Ponderados Iterados para encontrar los coeficientes.
+
+Similar al Modelo Lineal hacen uso de la distribución Normal para poder crear diseñar una prueba de hipótesis que permite identificar si una variable independiente es estadísticamente significativa dentro del modelo es decir $H0:\beta_i=0$ para el coeficiente de alguna variable $i$. La función $glm$ también calcula esta estadística por variable. 
+
+\newpage
+
+# 3. Modelo de XGradient Boosting
+
+Para poder entender el modelo de XGradient Boosting (por sus siglas en inglés Extreme Gradient Boosting) es necesario dar una breve introducción a los Árboles de Regresión ya que constituyen la base esta metodología.
+
+## 3.1 Árbol de Regresión
+
+Un Árbol de Regresión es un modelo estadístico utilizado para predecir valores numéricos continuos a partir de un conjunto de datos. Cada observación en el conjunto contiene una variable objetivo conocida y un conjunto de variables explicativas. El modelo construye una estructura en forma de árbol que divide los datos de manera secuencial en subconjuntos cada vez más homogéneos. 
+
+La siguiente imagen es una representación de la estructura de un Árbol de Regresión. Éste modelo se estimó usando los datos $mtcars$ de la paquetería $R$ hecha con la librería $rpart$. Estos datos contienen información sobre el rendimiento de 32 autos así como 10 características de estos. La variable objetivo es el rendimiento del vehículo (Millas por Galón de Gasolina), y las variables explciativas son los Caballos de Fuerza y el Peso de Cada vehículo.
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Ejemplo de Árbol de Regresión", fig.height = 3, fig.width = 5}
+
+# Cargar datos y renombrar variables
+datos <- mtcars
+names(datos)[names(datos) == "wt"] <- "Peso"
+names(datos)[names(datos) == "hp"] <- "Caballos de Fuerza"
+
+# Crear el modelo de árbol de regresión
+modelo <- rpart(mpg ~ Peso + `Caballos de Fuerza`, data = datos, method = "anova")
+
+# Graficar el árbol con nombres legibles
+rpart.plot(modelo, main = "Árbol de regresión: Millas por Galón de Gasolina", type = 3, extra = 101)
+```
+
+Este Árbol de Regresión contiene 2 nodos internos y 3 nodos terminales. Cada nodo terminal indica la predicción de Millas por Galón de Gasolina, la cantidad de observaciones que contiene el nodo, así como el porcentaje que estas representan del total. Por ejemplo, el primer nodo terminal (de izquierda a derecha) indica que los vehículos que tienen un peso mayor o igual a 2.4 toneladas y una potencia (caballos de fuerza) superior a 178 rinden 14 Millas por Galón de Gasolina. Adicionalmente, este nodo agrupa 10 de 32 observaciones, lo que representa aproximadamente el 31% del conjunto de datos.
+
+La siguiente gráfica ilustra como se dividió el espacio de las variables explicativas del Árbol de Regresión anterior para poder calcular las predicciones de las Millas por Galón.
+
+\newpage
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Partición del Espacio de Variables Predictoras", fig.height = 3, fig.width = 4}
+
+# Cargar datos y renombrar variables
+datos <- mtcars
+names(datos)[names(datos) == "wt"] <- "Peso"
+names(datos)[names(datos) == "hp"] <- "Caballos de Fuerza"
+
+# Crear el modelo de árbol de regresión
+modelo <- rpart(mpg ~ Peso + `Caballos de Fuerza`, data = datos, method = "anova")
+
+# Crear una cuadrícula para predecir
+wt_seq <- seq(min(datos$Peso), max(datos$Peso), length.out = 200)
+hp_seq <- seq(min(datos$`Caballos de Fuerza`), max(datos$`Caballos de Fuerza`), length.out = 200)
+grid <- expand.grid(Peso = wt_seq, `Caballos de Fuerza` = hp_seq)
+
+# Predecir mpg en cada punto de la cuadrícula
+grid$pred <- predict(modelo, newdata = grid)
+
+# Graficar
+ggplot() +
+  geom_contour(data = grid, aes(x = Peso, y = `Caballos de Fuerza`, z = pred), color = "black", linewidth = 0.1) +
+  geom_point(data = datos , aes(x = Peso, y = `Caballos de Fuerza`), color = "blue", size = 0.3) +
+  labs(
+    title = "Regiones de Decisión de un Árbol de Regresión",
+    x = "Peso del Auto (en miles de libras)",
+    y = "Caballos de Fuerza"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 10))  # This goes here
+```
+
+En la gráfica se aprecia que para construir un Árbol de Regresión se definieron 3 regiones que no están superpuestas. Estas regiones corresponden a los 3 nodos terminales del gráfico del Árbol de Regresión. Y, para obtener la predicción de las Millas por galón de Gasolina que aparece en cada nodo terminal se calcula el promedio de todas las observaciones de cada región.
+
+De manera general cuando se tiene un conjunto de datos $\{X_1,...,X_p\}$ con una variable explicativa $Y$ lo que se necesita para poder estimar un Árbol de REgresión es lo siguiente:
+
+1. Dividir el espacio de variables explicativas (es decir todo el conjunto de valores posibles para $X_1$,...,$X_p$) en $J$ distintas regiones $R_1$,...,$R_j$ que no estén superpuestas y que minimicen alguna función objetivo.
+
+2. Para obtener predicciones de cada observación que pertenezca a la región $R_i$ se calcula el promedio de las variables respuestas de las observaciones que se encuentren en esa región.
+
+Del ejemplo anterior, obtuvimos 3 regiones ($R_1$, $R_2$, y $R_3$) y el valor promedio de la variable respuesta en cada región es 14, 20 y 29 Millas por Galón de Gasolina respectivamente. Entonces, para poder construir las regiones $R_1$,...,$R_j$ no superpuestas que minimicen una función objetivo, es necesario definir tanto una forma factible de dividir el espacio de las variables explicativas como la función objetivo. La función objetivo utilizada en la literatura y para estimar un Árbol de Regresión es el Error Cuadrático (EC) que se define de la siguiente manera: 
+
+
+$$
+EC=\sum_{j=1}^{J} \sum_{i \in R_j}  (y_i - \hat{y}_{R_j})^2
+$$
+
+
+Donde $\hat{y}_{R_j}$ es el promedio de la variable respuesta para la observación en la región $j$. 
+
+Esta función objetivo se encuentra implementada en la función $rpart$ de la librería $rpart$ en $R$. Además, la función de pérdida utilizada en el modelo posee propiedades matemáticas importantes, como la convexidad y la doble derivabilidad (es decir, es una función diferenciable de segundo orden). Estas características son fundamentales porque garantizan la existencia de un único mínimo global.
+
+Entonces, tenemos que definir una forma de dividir el espacio de variables explicativas en diferentes regiones no superpuestas. Dado que considerar todas las posibles particiones del espacio de variables explicativas resulta computacionalmente inviable, se recurre a un proceso llamado particionamiento recursivo binario descendente. Es decir, se comienza con un único nodo que contiene todas las observaciones y, en cada paso, se divide el espacio de las variables explicativas en dos ramas utilizando una de las variables explicativas. En cada iteración, se selecciona la división que minimiza la función objetivo, optimizando el ajuste del modelo.
+
+Entonces, primero se selecciona la variable predictora $X_i$ y se selecciona un punto de corte $s$ tal que las regiones $R_1=\{X_i|X_i<s\}$ y $R_2=\{X_i|X_i>=s\}$ minimicen el EC. Después se selecciona otra variable $X_j$ y se hace lo mismo. De esta manera se consideran todas las posibles variables explicativas, diferentes puntos de corte, y aquella estimación que minimice el EC. Aunque puede parecer un buen método existe el riesgo de que el Árbol de Regresión resultante sea demasiado grande y tenga muchos nodos terminales (sea muy complejo) por lo que termine sobreajustado. Es decir, el Árbol de Regresión setá muy adaptado a las particularidades del conjunto de entrenamiento y, por lo tanto, generar predicciones poco confiables en nuevos datos. Para evitar este sobreajuste y, al mismo tiempo, no generar un árbol excesivamente simple (con muy pocos nodos), se incorpora un término de penalización de complejidad a la función objetivo a minimizar.
+
+$$
+\sum_{j=1}^{J} \sum_{i \in R_j}  (y_i - \hat{y}_{R_j})^2 + \alpha|T|
+$$
+Donde:
+
++ $|T|$ es el número de nodos terminales.
++ $\alpha$ es el parámetro de ajuste.
+
+Mientras $\alpha$ se haga grande, vamos a tener un Árbol de Regresión mucho menos complejo, pero si $\alpha=0$ regresamos al caso anterior es decir al Árbol de Regresión sin restricciones. Por lo que la estimación del Árbol de Regresión se reduce a encontrar las regiones minimicen la función objetivo anterior más un término de penalización de complejidad.
+
+Finalmente, aunque se agrega un parámetro adicional $\alpha$ que es fijo, la función $rpart$ de la paquetería de $rpart$ en $R$ lo hace con validación cruzada (Cross Validation) que es una técnica estadística utilizada para evaluar el desempeño de un modelo predictivo de manera más robusta, y lo que hace es dividir el conjunto de datos en $K$ subconjuntos del mismo tamaño. El procedimiento se repite $K$ veces, de modo que en cada iteración se utiliza uno de los subconjuntos como conjunto de validación, y los $K-1$ restantes como conjunto de entrenamiento.
+
+
+## 3.2 XGRadient Boosting
+
+El Modelo XGradient Boosting (por sus siglas en inglés Extreme Gradient Boosting) es una extensión optimizada de las metodologías de Gradient Boosting Machines y AdaBoost. Se encuentra implementada a través de la paquetería $xgboost$ con la función $xgboost$ en $R$. De manera general la metodología de XGradient Boosting consiste en entrenar secuencialmente pequeños Árboles de Regresión usando los residuos como variable objetivo para los siguientes árboles hasta obtener un nivel adecuado de precisión.
+
+El algoritmo para estimar el modelo con un grupo de datos de tamaño $m$, con $n$ variables explicativas y una variable obejtivo $y$ es el siguiente:
+
+1. Establece $\hat{f}(x_1,...x_n)=0$ y $z=y$
+
+2. Para $k=1,...,b$ se repite: 
+
+> a) Estimar el árbol de decisión $\hat{f}^{k}$ de profundidad $p$ (con $p+1$ nodos terminales) a la base de datos
+
+> b) Actualizar $\hat{f}$ de la siguiente manera
+
+$$
+\hat{f}(x_1,...x_n) \leftarrow\hat{f}(x_1,...x_n)+\eta*\hat{f}^{(k)}(x_1,...x_n)
+$$
+
+>> donde $\eta$ es la tasa de aprendizaje que determina la influencia del árbol en las estimaciones subsecuentes y es un parámetro predefinido.
+
+> c) Actualizar los residuos $z$ de la siguiente manera
+
+$$
+z \leftarrow z-\eta*\hat{f}^{(k)}(x_1,...x_n)
+$$
+
+3. Se repiten $b$ veces los pasos en 2 o hasta que se cumpla algún requisito de precisión establecido, por ejemplo una reducción de la función objetivo no significativa con respecto al árbol anterior
+
+4. Para poder obtener una estimación se hace la suma de todas las predicciones de los árboles calculado de la siguiente manera:
+
+$$
+\hat{f}(x_1,...x_n)=\sum_{k=1}^{b}{\eta*{f}^{(k)}(x_1,...x_n)}.
+$$
+
+Usualmente se usan Árboles de Regresión de poca profundidad y se estiman usando un criterio que minimice alguna función objetivo como la definida en el capítulo anterior. De acuerdo a Gareth James et al. la mejor técnica para encontrar el hiperparámetro $b$ es usando validación cruzada, así mismo el mismo autor sugiere que el hiperparámetro $\eta$ varía de acuerdo al problema, por lo que no existe una sugerencia.
+
+Además, aunque no hay una forma definitiva para encontrar el parámetro $p$, de acuerdo a Gareth James et al. un parámetro de $p=1$ funciona bien.
+
+El siguiente diagrama muestra de manera visual como el algoritmo genera diferentes Árboles de Regresión usando recursivamente los residuos mientras se minimiza alguna función objetivo. Al final la predicción para un dato es la suma ponderada del resultado de cada árbol de decisión. 
+
+\newpage
+
+```{r, echo = FALSE, message = FALSE, fig.align = 'center', fig.cap = "Diagrama de 3 Iteraciones del Algoritmo del Modelo de XGradient Boosting", out.width="60%", out.height="40%"}
+
+graph <- grViz("
+digraph xgboost_process {
+  
+  graph [layout = dot, rankdir = TB]
+  node [shape = rectangle, style = filled, fillcolor = lightblue, fontname = Helvetica, fontsize = 12]
+
+  datos        [label = '📦 Datos de Entrada\n(Ej: Variables Independientes y Variables Dependiente)']
+  arbol1       [label = '🌳 Árbol 1\nPredicción inicial']
+  residuos1  [label = '🔁 Calcular Residuos\n Árbol 1']
+  arbol2       [label = '🌳 Árbol 2\nResiduos']
+  residuos2  [label = '🔁 Calcular Residuos\n Árbol 2']
+  arbol3       [label = '🌳 Árbol 3\nResiduos']
+  residuos3  [label = '🔁 Calcular Residuos\n Árbol 3']
+  suma         [label = '➕ Suma Ponderada de Predicciones']
+  pred_final   [label = '✅ Predicción final\nModelo optimizado']
+
+  datos -> arbol1
+  datos -> arbol2
+  datos -> arbol3
+  arbol1 -> residuos1
+  residuos1 -> suma
+  residuos1 -> arbol2
+  arbol2 -> residuos2
+  residuos2 -> suma
+  residuos2 -> arbol3
+  arbol3 -> residuos3 
+  residuos3 -> suma
+  suma -> pred_final
+  
+      { rank = same; arbol1;arbol2 }
+      { rank = same; arbol1;arbol3 }
+}
+")
+
+
+# Convertir a SVG y luego a PDF para incrustar
+svg <- export_svg(graph)
+tmp_svg <- tempfile(fileext = ".svg")
+writeLines(svg, tmp_svg)
+tmp_pdf <- tempfile(fileext = ".pdf")
+rsvg_pdf(tmp_svg, tmp_pdf)
+
+# Incluir la imagen PDF generada
+knitr::include_graphics(tmp_pdf)
+
+```
+
+
+Al igual que en el caso del Árbol de Regresión, una vez definido el algoritmo para obtener la estimación, es necesario establecer una función objetivo que guíe el proceso de optimización. Una de las principales diferencias de XGradient Boosting respecto a otras metodologías es que los Árboles de Regresión se entrenan de forma secuencial: primero se construye un árbol, y luego se agregan sucesivos árboles, uno a uno, durante $b$ iteraciones o hasta que se cumpla un criterio de parada. Cada nuevo Árbol de Regresión se ajusta para corregir los errores residuales cometidos por el conjunto de árboles anteriores, lo que permite mejorar progresivamente la precisión del modelo.
+
+De acuerdo a Tianqi Chen y Carlos Guestrin (2016) para este modelo se usa la siguiente función objetivo para encontrar el Árbol de Regresión en el paso $t$ ($t<=b$).
+
+$$
+ \sum_{i=1}^{n} l(y_i, \hat{y}_i^{(t)}) + \sum_{k=1}^{t} \omega(f_k)
+$$
+
+Donde:
+
+- $l(y_i, \hat{y}_i^{(t)})$: Función de pérdida que mide la diferencia entre la predicción del modelo $\hat{y}_i^{(t)}$ en la iteración $t$ y el valor real $y_i$.
+- $\omega(f_k)$: Es una función que tiene el objetivo de mide la complejidad de un Árbol de Regresión $f_k$ y es un término de regularización que penaliza la complejidad del Árbol de Regresión $f_k$
+- $n$: Número total de observaciones en el conjunto de datos.
+- $t$: Número total de árboles construidos hasta la iteración actual.
+
+El problema con minimizar la función anterior es que el término $\omega(f_t)$ no puede minizarse de manera tradicional al estar en función de un Árbol de Regresión, es decir no podemos encontrar un Árbol de Regresión que minimice la función $\omega(.)$ usando técnicas analíticas tradicionales. Entonces, la estimación $\hat{y}_i^{(t)}$ se puede desarrollar como:
+
+$$
+\hat{y}_i^{(0)} = 0
+$$
+
+$$
+\hat{y}_i^{(1)} = f_1(x_i) = \hat{y}_i^{(0)} + f_1(x_i)
+$$
+
+$$
+\hat{y}_i^{(2)} = f_1(x_i) + f_2(x_i) = \hat{y}_i^{(1)} + f_2(x_i)
+$$
+
+$$
+\vdots
+$$
+
+$$
+\hat{y}_i^{(t)} = \sum_{k=1}^{t} f_k(x_i) = \hat{y}_i^{(t-1)} + f_t(x_i)
+$$
+
+Por lo tanto, que se encontró una forma de representar la función objetivo del t-ésimo Árbol de Regresión como una suma de estimaciones anteriores más el t-ésimo Árbol de Regresión. Sustituyendo en la ecuación original, se puede expresar la función objetivo en t como:
+
+$$
+\text{obj}^{(t)} = \sum_{i=1}^{n} l(y_i, \hat{y}_i^{(t)}) + \sum_{k=1}^{t} \omega(f_k) = \sum_{i=1}^{n} l\left(y_i, \hat{y}_i^{(t-1)} + f_t(x_i)\right) + \omega(f_t) + \sum_{k=1}^{t-1} \omega(f_k) 
+$$
+Se puede aproximar la función objetivo $l(x,y)$ usando la expansión de Taylor alrededor de $\hat{y}_i^{(t-1)}$ hasta el segundo término.
+
+
+$$
+l(y_i, \hat{y}_i^{(t-1)}+f_t(x_i)) \approx l(y_i, \hat{y}_i^{(t-1)}) + g_i f_t(x_i) + \frac{1}{2} h_i f_t(x_i)^2
+$$
+
+Donde:
+
+- $g_i = \left. \frac{\partial l(y_i, \hat{y})}{\partial \hat{y}} \right|_{\hat{y} = \hat{y}_i^{(t-1)}}$ es el gradiente.
+- $h_i = \left. \frac{\partial^2 l(y_i, \hat{y})}{\partial \hat{y}^2} \right|_{\hat{y} = \hat{y}_i^{(t-1)}}$ es el Hessiano o segunda derivada.
+
+Sustituyendo la expansión de Taylor en la función objetivo:
+
+$$
+\text{obj}^{(t)} \approx \sum_{i=1}^n \left[ l(y_i, \hat{y}_i^{(t-1)}) + g_i f_t(x_i) + \frac{1}{2} h_i f_t(x_i)^2 \right] + \omega(f_t) + \sum_{k=1}^{t-1} \omega(f_k) 
+$$
+Excluyendo los términos constantes que no influyen en la minimización, entonces tenemos:
+
+$$
+\text{obj}^{(t)} \approx \sum_{i=1}^n \left[ g_i f_t(x_i) + \frac{1}{2} h_i f_t(x_i)^2 \right] + \omega(f_t)
+$$
+
+Tianqi Chen y Carlos Guestrin (2016) usan la siguiente definición para $\omega(f_t)$:
+
+$$
+\omega(f_t) =  \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_{j}^2 
+$$
+Donde $w_{q(x)} \in \mathbb{R}^T$ es un vector con los valores estimados en cada nodo terminal del t-ésimo Árbol de Regresión, y $q:\mathbb{R}^n \rightarrow \{1,2,...,T\}$ es una función que asigna cada dato a un nodo terminal donde $T$ es el número de nodos terminales. Por lo tanto, la función $w_{q(x)}$ es un vector con los valores estimados en cada nodo terminal del t-ésimo Árbol de Regresión, y $q$ es una función que asigna cada dato a un nodo terminal de ese árbol.
+
+De esta forma podemos tener una función objetivo que se puede minimizar:
+
+$$
+\text{obj}^{(t)} \approx \sum_{i=1}^n \left[ g_i f_t(x_i) + \frac{1}{2} h_i f_t(x_i)^2 \right] + \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_{j}^2  
+$$
+
+Agrupando y usando las definiciones anteriores podemos llegar a la siguiente expresión:
+
+$$
+\text{obj}^{(t)} \approx \sum_{i=1}^{n} \left[ g_i w_{q(x_i)} + \frac{1}{2} h_i w_{q(x_i)}^2 \right] + \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2 
+$$
+Dado que cada nodo terminal asigna la misma predicción a todos los datos que contiene, el término anterior puede reescribirse de la siguiente forma:
+
+$$
+\text{obj}^{(t)} \approx \sum_{j=1}^{T} \left[ \left( \sum_{i \in I_j} g_i \right) w_j + \frac{1}{2} \left( \sum_{i \in I_j} h_i + \lambda \right) w_j^2 \right] + \gamma T
+$$
+
+Done $I_j=\{i|q(x_i)=j\}$ representa el conjunto de índices de las observaciones asignadas al j-ésimo nodo terminal. Así mismo podemos hacer la expresión manera más pequeña si definimos lo siguiente:
+
+$$
+G_j = \sum_{i \in I_j} g_i \quad \text{y} \quad H_j = \sum_{i \in I_j} h_i
+$$
+Así terminamos con la siguiente expresión para la función objetivo del t-ésimo Árbol de Regresión a minimizar.
+
+$$
+\text{obj}^{(t)} = \sum_{j=1}^{T} \left[ G_j w_j + \frac{1}{2} (H_j + \lambda) w_j^2 \right] + \gamma T
+$$
+Sin embargo, también se puede encontrar el $w_j$ que minimiza la función anterior derivando con respecto a $w_j$ e igualandola a 0. Así obtenemos que la función objetivo alcanza el mínimo cuando.
+
+$$
+w_j^{*}=-\frac{G_j}{H_j + \lambda}
+$$
+Y al substituirla en la función objetivo tenemos que el mínimo valor de la función objetivo es:
+
+$$
+\text{obj}^{(*)}  = -\frac{1}{2}\sum_{j=1}^{T} \frac{G_j^2}{H_j + \lambda} + \gamma T
+$$
+
+La expresión anterior evaluada para una $j$ se llama "Score" que se utiliza para evaluar la calidad de una posible división en la estructura del Árbol de Regresión dentro del modelo XGBoost. Durante el proceso de construcción del árbol en la iteración t, esta métrica permite estimar la reducción esperada del error al considerar una variable explicativa $X_i$ como punto de partición. En otras palabras, el "Score" ayuda a determinar qué división produce la mayor ganancia en términos de ajuste del modelo, guiando así la selección óptima de variables y puntos de corte en cada nodo del árbol.
+
+La paquetería de $xgboost$ tiene la función $xgb.plot.importance$ la cual utiliza el score como base para calcular la ganancia ("Gain") asociada a cada variable explicativa. Esta métrica representa la contribución promedio de cada variable a la reducción del error del modelo a lo largo de todos los árboles. En esencia, el "Gain" mide cuánto mejora el modelo, en términos de su función objetivo, al utilizar una variable determinada como criterio de división en los nodos del árbol.
+
+El cálculo del "Gain" de cada variable $i$ es el siguiente:
+
+$$
+Gain_i=Score\ Antes\ de\ Dividir\ por\ Variable\ i -(Score\ Nodo\ Izquierdo+Score\ Nodo\ Derecho)
+$$
+
+Aunque una de las principales ventajas del modelo XGBoost es su alta capacidad predictiva (superando habitualmente el desempeño de un solo Árbol de Regresión de acuerdo a Gareth James et al.), esto se debe a que XGBoost construye un conjunto de árboles secuenciales, donde cada uno corrige los errores del anterior, lo que genera una estructura compleja difícil de descomponer e interpretar de forma directa. A diferencia de un Árbol de Regresión individual, cuya lógica de decisión puede visualizarse fácilmente. La siguiente imagen muestra el "Gain" del modelo del capítulo anterior que usa los datos $mtcars$, pero usando la metodología de XGradient Boosting con 10 iteraciones, parámetro $\eta=0.5$, $\gamma = 0$ y los Árboles de Regresión con profundidad de 1.
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Ejemplo de Importancia de Variables", fig.height = 2, fig.width = 3}
+
+
+# Usar mtcars: predeciremos 'mpg' (consumo) usando el resto como predictores
+data(mtcars)
+
+# Convertir a matriz y separar variables
+X <- as.matrix(mtcars[,c(4, 6)])  # Predictores (sin mpg)
+y <- mtcars$mpg               # Variable respuesta
+
+# Crear estructura de datos para xgboost
+dtrain <- xgb.DMatrix(data = X, label = y)
+
+
+# Entrenar un modelo simple
+modelo <- xgboost(
+  data = dtrain,
+  objective = "reg:squarederror",  # Para regresión
+  nrounds = 3,                    # Número de iteraciones
+  verbose = 0,                      # Silencia la salida
+    eta = 0.5, 
+  max_depth = 1,
+  gamma = 0
+)
+
+
+
+# Obtener la importancia de las variables
+importancia <- xgb.importance(model = modelo)
+
+# Mostrar tabla (opcional)
+#print(importancia)
+
+# Graficar importancia
+#xgb.plot.importance(importancia, top_n = 10)
+
+#importance <- xgb.plot.importance(importancia, top_n = 10)
+
+importancia$Nombre <- c("Peso", "Caballos de Fuerza")
+
+#xgb.plot.importance(importance_matrix, 
+#                    rel_to_first = FALSE, 
+#                    xlab = "Importancia", 
+#                    top_n = 4) 
+
+ggplot(importancia, aes(x = reorder(Nombre , Gain), y = Gain)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  theme_minimal() +
+  ggtitle("Importancia de Variables") +
+  labs(x = "Variable", y = "Ganancia") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 8, face = "bold")
+  )
+
+
+
+
+```
+
+
+En el ejemplo se observa que la variable más importante fué el peso del automóvil ("wt") ya que representa más del 60% del Gain total del modelo. 
+
+Haciendo una comapración de las estimaciones con el modelo obtenido en el Árbol de Regresión del capítulo anterior podemos ver lo siguiente:
+
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+
+# Cargar datos
+data(mtcars)
+
+# Seleccionar predictores y variable objetivo
+X <- as.matrix(mtcars[, c("wt", "hp")])  # Predictores
+y <- mtcars$mpg                          # Respuesta
+
+# Crear objeto DMatrix para XGBoost
+dtrain <- xgb.DMatrix(data = X, label = y)
+
+modelo_xgb <- xgboost(
+  data = dtrain,
+  objective = "reg:squarederror",
+  nrounds = 10,
+  verbose = 0,
+  eta = 0.5, 
+  max_depth = 1,
+  gamma = 0
+)
+
+# Predicciones con XGBoost
+pred_xgb <- predict(modelo_xgb, X)
+
+# Convertir a data.frame para rpart
+df <- mtcars[, c("mpg", "wt", "hp")]
+
+# Ajustar modelo rpart
+modelo_rpart <- rpart(mpg ~ wt + hp, data = df)
+
+# Predicciones con rpart
+pred_rpart <- predict(modelo_rpart, newdata = df)
+
+
+# Crear tabla de comparación
+resultados <- data.frame(
+  Real = y,
+  XGBoost = round(pred_xgb, 2),
+  RPart = round(pred_rpart, 2)
+)
+
+# Mostrar tabla
+#kable(resultados, caption = "Comparación de predicciones: XGBoost vs rpart")
+
+
+```
+
+|                    | Real| XGBoost| Árbol de Regresión|
+|:-------------------|----:|-------:|-----:|
+|Mazda RX4           | 21.0|   21.88| 19.79|
+|Mazda RX4 Wag       | 21.0|   21.88| 19.79|
+|Datsun 710          | 22.8|   21.88| 29.03|
+|Hornet 4 Drive      | 21.4|   21.88| 19.79|
+|Hornet Sportabout   | 18.7|   17.62| 19.79|
+|Valiant             | 18.1|   20.61| 19.79|
+|Duster 360          | 14.3|   13.81| 14.28|
+|Merc 240D           | 24.4|   23.73| 19.79|
+|Merc 230            | 22.8|   21.88| 19.79|
+|Merc 280            | 19.2|   17.62| 19.79|
+|Merc 280C           | 17.8|   17.62| 19.79|
+|Merc 450SE          | 16.4|   16.34| 14.28|
+|Merc 450SL          | 17.3|   16.34| 14.28|
+|Merc 450SLC         | 15.2|   16.34| 14.28|
+|Cadillac Fleetwood  | 10.4|   12.89| 14.28|
+|Lincoln Continental | 10.4|   12.89| 14.28|
+|Chrysler Imperial   | 14.7|   12.89| 14.28|
+|Fiat 128            | 32.4|   29.46| 29.03|
+|Honda Civic         | 30.4|   31.32| 29.03|
+|Toyota Corolla      | 33.9|   31.32| 29.03|
+|Toyota Corona       | 21.5|   21.88| 19.79|
+|Dodge Challenger    | 15.5|   16.34| 19.79|
+|AMC Javelin         | 15.2|   17.62| 19.79|
+|Camaro Z28          | 13.3|   13.81| 14.28|
+|Pontiac Firebird    | 19.2|   16.34| 19.79|
+|Fiat X1-9           | 27.3|   29.46| 29.03|
+|Porsche 914-2       | 26.0|   27.62| 29.03|
+|Lotus Europa        | 30.4|   29.48| 29.03|
+|Ford Pantera L      | 15.8|   15.09| 14.28|
+|Ferrari Dino        | 19.7|   17.62| 19.79|
+|Maserati Bora       | 15.0|   13.81| 14.28|
+|Volvo 142E          | 21.4|   21.88| 19.79|
+Table: Comparación de predicciones: XGBoost contra Árbol de Regresión
+
+Se observa que ambos modelos capturan en términos generales la tendencia de los valores reales; sin embargo, presentan diferencias en la precisión de sus predicciones. En particular, el modelo de XGBoost tiende a ajustarse mejor en ciertos casos. Por ejemplo, para el automóvil Merc 240D, el Árbol de Regresión subestima notablemente el valor real, mientras que XGBoost proporciona una predicción mucho más cercana. Este comportamiento refleja la capacidad de XGBoost para modelar relaciones más complejas entre las variables.
+
+
+\newpage
+
+# 4. Propuesta de Validación de los Modelos
+
+Aunque el objetivo principal de este trabajo es identificar el modelo con las mejores capacidades predictivas, también resulta fundamental evaluar su capacidad de inferencia. Esto permite determinar en qué medida el modelo puede generalizar los resultados y, por ende, realizar predicciones confiables. Por esta razón, la propuesta incluye la validación de los supuestos del Modelo Lineal, el análisis de la permanencia de variables, así como la consideración de una transformación logarítmica de las variables. Finalmente, se usan algunas métricas con un análisis visual para determinar si el modelo tiene buena capacidad predictiva. Los siguientes puntos presentan para la validación de los supuestos de los modelos.
+
+Para el Modelo Lineal y el Modelo Lineal Generalizado se hará lo siguiente:
+
++ Se evaluará la permamencia de variables explicativas utilizando como criterio el $p-value$. Adicionalmente, se evaluará si la estimación es adecuada de acuerdo a la métrica de $R^2-ajustada$ y en el caso del Modelo Lineal se hará un análisis visual de los supuestos usando la función $plot$ de la paquetería base de $R$ la cual genera diferentes gráficas diagnósticas que permiten evaluar si los supuestos del modelo se cumplen adecuadamente. 
+
++ Además, la función $plot$ permite visualizar la distancia de Cook, una medida útil para identificar observaciones influyentes o posibles outliers en el modelo.
+
++ Se realizará un análisis de residuos para evaluar la relación entre los valores estimados y los valores reales. Esto permite determinar qué tan bien las predicciones del modelo capturan el comportamiento real de los datos.
+
++ Se repetirá el procedimiento del punto anterior, pero aplicando una transformación logarítmica a la variable objetivo y a algunas variables explicativas (como la Suma Asegurada). Ya que esta transformación puede mejorar el desempeño del modelo al estabilizar la varianza y reducir la influencia de valores atípicos, lo que potencialmente mejora la capacidad predictiva. Una vez realizada la estimación con la variable objetivo transformada, se compararán los modelos utilizando el Coeficiente de Información Bayesiano (CIB), con el fin de evaluar cuál ofrece un mejor ajuste.
+
+Los pasos anteriores se harán dentro del capítulo de la estimación de cada modelo. Además, se utilizará la transformación que haya demostrado el mejor desempeño en los análisis anteriores al aplicar el modelo de XGBoost, con el fin de garantizar una comparación más justa y consistente entre metodologías. El modelo de XGBoost también tendrá un análisis de importancia de variables así como se describió en el capítulo 3.2.
+
+Asimismo, con el fin de validar la capacidad predictiva de los modelos, se dividirán los datos en dos partes: el 80% se utilizará para el ajuste del modelo, mientras que el 20% restante se destinará a su validación. Esto permitirá obtener métricas que faciliten la comparación de su desempeño predictivo. Las métricas empleadas serán las siguientes:
+
+  + Error Porcentual Absoluto Medio (EPAM): esta métrica mide el porcentaje promedio de separación del precio real del seguro de automóvil contra el precio del seguro de automóvil estimado. La métrica es útil ya que es una comparación en términos porcentuales, la fórmula es la siguiente
+
+$$
+EPAM=\frac{1}{n}\sum_{i=1}^{n}\left|\frac{\hat{Y}_i-{Y}_{i}}{{Y}_{i}}\right|.
+$$
+
+
+  + Error Absoluto Medio (EAM): esta métrica mide la diferencia absoluta con la estimación del modelo. La métrica es útil ya que ofrece una comparación en pesos en términos absolutos, con fórmula
+
+$$
+EAM=\frac{1}{n}\sum_{i=1}^{n}\left|\hat{Y}_i-{Y}_{i}\right|.
+$$
+
+  + Raíz del Error Cuadrático Medio (ECM): esta métrica mide la diferencia cuadrada entre el precio real del seguro de automóvil con la del estimado, cuya fórmula es
+  
+$$
+ECM=\sqrt{\frac{1}{n}\sum_{i=1}^{n}(\hat{Y}_i-{Y}_{i})^2}.
+$$  
+
+Además de las métricas se harán unas gráficas con los datos de validación que permiten comaprar los resultados del modelo por variable. Dependiendo del tipo de la variable (categórica o continua) se hace un histograma o un diagrama de barras. Por cada intervalo del histograma o categoría del diagrama se calcula el promedio del valor real y el promedio del valor estimado. Esto nos permite identificar que modelo sigue mejor el precio real por variable, y poder evaluar a un nivel más desagregado los resultados finales. Cada análisis se hizo por las variables más importantes que son el municipio del asegurado, intervalo de suma asegurada y la marca del automóvil. Aunque se usaron más variables para estimar los modelos se decidió enforcarse en esas variables ya que tienen más categorías, y esto ofrece una visualización más clara sobre la precisión de cada modelo.
+
+Finalmente, de acuerdo a Mark Goldburd, FCAS, MAAA et al. se puede hacer una comparación visual y directa entre modelos usando los gráficos de cuantiles que son una representación visual y sencilla de la capacidad predictiva de una modelo. La forma en la que se hace es la siguiente:
+
+1. Ordernar el conjunto de predicciones de menor a mayor.
+
+2. Agrupar los datos en cuantiles (usualmente se agrupan en quintiles o deciles).
+
+3. Dentro de cada intervalo calcular el promedio del valor real y el promedio del valor estimado
+
+Para poder determinar el modelo que ofrezca un mejor valor predictivo se deben considerar 3 cosas
+
++ La cercanía del valor del modelo al valor real
+
++ El valor del modelo debe aumentar de forma monótona al aumentar el cuantil, así como el valor real
+
++ Una diferencia grande (también llamada “lift”) entre el promedio del valor real en el cuantil más bajo y el más alto. Ya que esto indica que el modelo es capaz de distinguir entre los valores reales más altos y bajos.
+
+Para cada modelo se elaborará un gráfico de cuantiles con los datos de validación y se calculará su “lift” con el objetivo de identificar aquel con el mejor desempeño predictivo.
+
+El mejor modelos en capacidades predictivas será aquel que tengas las métricas de error más bajas, y cuyos análisis visuales represente el mejor ajuste.
+
+\newpage
+
+# 5. Aplicación
+
+En este capítulo se presenta una aplicación práctica de los modelos estadísticos descritos en los capítulos anteriores, específicamente en el contexto del sector asegurador. El objetivo es demostrar que el modelo de XGradient Boosting representa una alternativa eficaz para abordar problemas reales en el sector asegurador, ofreciendo además una mejora significativa en la capacidad predictiva en comparación con metodologías más tradicionales.
+
+A través de esta aplicación, se busca ilustrar el proceso completo de modelación: desde la presentación del problema, la selección de variables, la preparación de los datos, la selección del modelo adecuado, su ajuste y validación. 
+
+## 5.1 Definición del Problema
+
+El seguro de automóvil es obligatorio para poder manejar dentro del territorio Mexicano de acuerdo al artículo 63 Bis de la Ley de Caminos, Puentes y Autotransporte Federal. Además, la CONDUSEF indicó en 2021 que el 36% de la población adulta cuenta con seguro de automóvil. Entonces, más de la mitad de la población que maneja en México no está protegida ante el riesgo de un accidente, robo, gastos médicos o daños a terceros. Lo anterior se debe a que un factor importante que hace que las personas no compren un seguro de automóvil es el costo que a veces llega a fluctuar mucho o suele ser alto. Sin embargo, para que las empresas aseguradoras puedan reducir los costos del seguro sin afectar sus utilidades deben considerar diversos factores, pero uno que se ha vuelto muy importante en los últimos años son los precios de seguros de otras compañías aseguradoras ya que sus metodologías o técnicas de cálculo no suelen compartirse a detalle. Por lo que hace difícil que se puedan replicar. Aunque no se pueden conocer todas las metodologías exactas de las empresas aseguradoras si podemos tener información sobre el precio final en función de diversas características del asegurado, y con esa información poder hacer un modelo estadístico que permita predecir que los precios (sin conocer la metodología) e incluirlos cálculo más justo del precio del seguro. Por ejemplo, es posible usar la predicción del precio de otras compañías de seguro para cuantificar en que medida se puede reducir/ aumentar el precio final de un seguro que garantize un precio justo, adecuado al mercado y que sea para el alcance de los usuarios.
+
+El objetivo de la aplicación es poder estimar el precio calculado por una empresa de seguros que compartió su información haciendo uso de los diferentes atributos del asegurado, y las características del automóvil. Esto se hace con la intención de poder identificar qué factores usa una compañía de seguros, y poder predecir el precio final asumiendo que los precios se van a compartir entre empresas de seguros.
+
+La predicción se hará con las siguientes 3 metodolodgías: 
+
++ Regresión Lineal
++ Regresión Gamma
++ XGradient Boosting
+
+Por lo tanto, el objetivo es predecir el precio del seguro de automóvil con cobertura amplia y se confirmará que para este problema la técnica de Machine Learning tiene mayor poder predictivo que el resto de metodologías tradicionales. En la aplicación se usa una base de datos que contiene diferentes precios de seguro de automóvil bajo diferentes características del asegurado y del automóvil. 
+
+## 5.2 Descripición de los Datos Utilizados
+
+```{r, echo=FALSE, results = "hide"}
+benchmark_model <- benchmark_model[QUA_Desc_Num <= 30000]
+nrow(benchmark_model)
+```
+
+Los datos utilizados son desagrupados y comprenden un total de $16,942$ cotizaciones de seguros de auto con cobertura amplia. Estas cotizaciones abarcan diversos tipos de vehículos, incluyendo Sedán, SUV y camiones ligeros, ubicados en distintos estados del país. Los datos representan una muestra del tipo de vehículos comúnmente encontrados en la República Mexicana y las cotizaciones fueron realizadas por una compañía aseguradora en el año 2021, por lo que no reflejan los precios actuales del mercado. Finalmente, solo se consideraron cotizaciones menores a $30,000 pesos.
+
+A continuación, se muestra un ejemplo del tipo de información utilizada:
+
+|     Estado     |     Submarca_TP     | Modelo | ... | Desc_Num |
+|:--------------------:|:--------------------------:|:-------:|:---:|:-----------:|
+| Aguascalientes | JEEP-GRAND CHEROKEE |  2015  | ... |  $8,318  |
+Table: Ejemplo de la Estructura de los Datos
+
+En el ejemplo vemos que el seguro con cobertura amplia para una Jeep-Grand Cherokee modelo 2015 ubicada en Aguascalientes tiene un precio de $8,318 pesos. A continuación se presenta una breve descripción de las variables.
+
+| Variable             | Tipo     | Descripción                                                                                                                                                                                                                                  |
+|---------------------------------------------------------------------|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Desc_Num             | Contínua | Precio (en Pesos Mexicanos) del seguro de automóvil con cobertura amplia que cubre al automóvil por 1 año. Es la variable objetivo.                                                                                                                                                                                           |
+| Modelo               | Nominal | El   año del modelo del automóvil cotizado. Los modelos de la base son de 2002 a 2021.                                                                                                                                                      |
+| Moneda               | Nominal  | Identifica   la moneda en la que se cotizó el seguro:      USD - Dólares      MXN - Pesos Mexicanos.                                                                                                                                      |
+| Segmento_R             | Nominal  | Variable creada para identificar el segmento del automóvil cotizado. Los valores que puede tomar la variable son los   siguientes:      Auto Compacto      Auto Deportivo,      Auto Especial,      Auto Subcompacto,      Auto Uso Múltiple y Camion Ligero de hasta 3.5 toneladas. |
+| Elegible_UBER        | Nominal  | Identifica   si el automóvil cotizado cumple los requisitos de 2021 para poder ser usado en la   plataforma de transporte privado UBER. Los valores que puede tomar son:         No o Si.                                                    |
+| Agencia_Taller       | Nominal  | Identifica   si el automóvil cotizado es de Taller o Agencia. Los valores que puede tomar   son: Taller y Agencia.                                                                                                                         |
+| QC                   | Nominal  | Identifica   si el automóvil tiene techo solar. Los valores que puede tomar son:      1 - Si tiene o 0 - No tiene.                                                                                                                         |
+| Frenos               | Nominal  | Indica si el automóvil tiene frenos con Anti Lock Braking System (ABS por sus siglas en inglés). 1 - Si tiene, 0 - No tiene o Desconocido - No se sabe si los tiene.                                                                                                                                                                                                                       |
+| Pasajeros_5          | Nominal  | Identifica   si el automóvil cotizado es para 5 pasajeros o no. Los valores que puede tomar   son:      1 - Si o 0 - No.                                                                                                                        |
+| Zona_volatilidad_Ord | Nominal  | Variable   creada para poder capturar la variabilidad del precio de seguro de un   automóvil en función del Municipio de cotización. Los valores que puede tomar son:      Baja, Media o Nula.                              |
+| SA_siniestro         | Contínua | Suma   Asegurada del seguro de automóvil.                                                                                                                                                                                                            |
+| Estado               | Nominal  | Estado   donde se realizó la cotización.                                                                                                                                                                                                      |
+| Tipo_Zona            | Nominal  | El   tipo de zona donde se realizó la cotización. Los valores que puede tomar   son:      Desconocido, Rural, Semiurbano o Urbano.                                                                                                 |
+| Carroceria_R         | Nominal  | La   clasificación revisada de la carrocería. Las posibles opciones son: Hatchback (HB), Minivan, Pick-Up, Sedán, Sport Utility Vehicle (SUV), Van y Otra (incluye Convertible, Coupé, Estacas, Station Wagon, Panel y Cabina).                                                                                                                                                                                                         |
+| Municipio_R          | Nominal  | Variable   creada para identificar si la cotización del asegurado pertenece a Zapopan,   Atizapán de Zaragoza, Guadalajara, Naucalpan de Juárez, Toluca y Morelia.                                                                            |
+                                                                                                          |
+Table: Descripción de Variables
+
+En los siguientes capítulos se describirán las variables, la razón por la que se agregaron al modelo y razonamiento detrás de la creación de algunas variables indicadoras.
+
+## 5.3 Variable Objetivo
+
+La variable objetivo es el precio del seguro con cobertura amplía que se identifica en la base como "Desc_Num". La cobertura amplia protege contra: robo total, gastos médicos a ocupantes, responsabilidad civil para bienes y responsabilidad civil para personas. La variable tiene el siguiente comportamiento.
+
+
+
+```{r plot1, echo=FALSE, fig.align="center", fig.cap="Gráfica de Violín del Precio del Seguro", warning=TRUE}
+
+ggplot(benchmark_model, aes(x = "", y = QUA_Desc_Num)) + 
+  labs(x = "", y = "Precio del Seguro") + 
+  geom_violin(trim = FALSE, fill = "gray") +
+  geom_boxplot(width = 0.1) + 
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar_format())
+
+```
+
+
+Como se observa en la gráfica anterior la variable tiene un sesgo positivo (la mediana es menor que la media) y tiene cola una pesada que también se observa en una distribución Gamma. Además las cotizaciones tienen la siguiente distribución de los cuantiles.
+
+```{r, echo=FALSE, results = "hide"}
+summary(benchmark_model$QUA_Desc_Num)
+```
+
+| Mínimo | Primer Cuartil | Mediana |  Media | Tercer Cuartil |  Máximo |
+|:------:|:--------------:|:-------:|:------:|:--------------:|:-------:|
+| \$3,475 |     \$6,548     |  \$7,970 | \$8,996 |     \$10,204    | \$29,993 |
+Table: Estadísticas del Precio de la Suma Asegurada
+
+El seguro más barato corresponde a un Chevrolet Chevy Modelo 2003 en Fortín de las Flores y el más caro corresponde a una Toyota Tacoma Modelo 2020 cotizado en Veracruz. Ambas cotizaciones tienen sentido ya que son vehículos con diferente antiguedad y en ubicaciones muy diferentes. Adicionalmente, la distribución de precios tiene una forma similar a una distribucióin gamma.
+
+La variable es adecuada al no tener un comportamiento inusual.
+
+## 5.4 Variables Explicativas
+
+En este capítulo se describirán las variables explicativas usadas para predecir el precio del seguro de automóvil. Algunas variables son características del automóvil y características del asegurado. Para todas las variables se hizo un análisis con gráficas de violín; sin embargo, en este trabajo sólo se dejaron aquellas gráficas que servían para poder identificar comportamientos particulares.
+
+
+### 5.4.1 Modelo del Automóvil
+
+La variable Modelo (identificada como "Modelo" en la base) nos dice el año del modelo automóvil cotizado. A continuación una gráfica comparando la relación entre la variable objetivo y el modelo.
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Distribución del Modelo Respecto al Precio"}
+ggplot(data = benchmark_model, aes(x = (Modelo), y = (QUA_Desc_Num))) +
+  geom_point() + 
+  labs(y = "Precio del Seguro", x = "Modelo") + 
+  theme_classic() + 
+  geom_smooth(mapping = aes(x = Modelo, y = (QUA_Desc_Num)), se = FALSE) + 
+  theme_classic() + 
+  scale_y_log10(labels = scales::dollar_format())
+```
+
+
+Existe una relación creciente y exponencial entre la variable objetivo con el Modelo del auto. Es decir, entre más nuevo es el modelo del automóvil asegurado, más cara es la cotización del seguro. Esta relación se considera adecuada ya que los seguros de automóvil son más caros para modelos más nuevos. Aunque el crecimiento no es lineal y la varianza va creciendo se va a usar ya que existe una relación con el precio final y se considerará una transformación logarítmica.
+
+
+### 5.4.2 Moneda
+
+La variable se identifica como "Moneda" en la base. Clasifica si el seguro se cotizó originalmente en dólares ($USD$) o en pesos mexicanos ($MXN$). Esto no impacta el precio final ya que todas las cotizaciones son en pesos mexicanos. Alrededor de 7.1% (1,195 datos de 16,942) de las cotizaciones fué hecha en dólares; sin embargo, la siguiente gráfica muestra que el comportamiento en términos del precio final es diferente.
+
+\newpage
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Gráfica de Violín por Moneda"}
+ggplot(benchmark_model, aes(x = as.factor(Moneda), y = QUA_Desc_Num)) + 
+    labs(x = "Moneda de la Cotización", y = "Precio del Seguro") + 
+    geom_violin(trim = FALSE, fill = "gray") +
+    geom_boxplot(width = 0.1) + 
+    theme_classic() + 
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    scale_y_continuous(labels = scales::dollar_format())
+
+nrow(benchmark_model)
+table(benchmark_model$Moneda)
+```
+
+El comportamiento de las cotizaciones en pesos tiene un sesgo positivo con valores más cercanos a 0. En comparación con lo observado para las cotizaciones en dólares que demuestran tener un comportamiento menos sesgado con una media y mediana más parecidas así como estar más alejadas del 0. Por lo que la variable discrimina el comportamiento del precio. Finalmente, el promedio de precios cotizados originalmente en dólares es superior a aquellos cotizados en pesos mexicanos, por lo que existe una diferencia entre categorías que ayudará en la predicción del precio.
+
+Se consideró agregar la variable al modelo ya que la categoría discrimina bien el monto final del seguro.
+
+
+### 5.4.3 Segmento
+
+La variable identificada como "Segmento" en la base de datos representa el tipo de automóvil cotizado. La siguiente gráfica muestra la distribución de esta variable.
+
+La variable "Segmento" presente en la base de datos corresponde a la clasificación del tipo de automóvil cotizado por el cliente. Esta variable permite agrupar los vehículos según sus características generales, como sedán, SUV, hatchback, entre otros. A continuación, se presenta una gráfica que ilustra la distribución de frecuencias de esta variable.
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Distribución de la Variable Segmento", fig.height = 3, fig.width = 5}
+ggplot(data = benchmark_original_dt, aes(x = Segmento)) + labs(x = "", y = "Número de Cotizaciones") +
+  geom_bar() + 
+  theme_classic() +
+  scale_x_discrete(guide = guide_axis(angle = 90)) + theme(
+    axis.text.x = element_text(size = 6),  # Tamaño del texto en el eje x
+    axis.text.y = element_text(size = 7),  # Tamaño del texto en el eje y
+    axis.title.y = element_text(size = 6)  # Tamaño del título del eje y
+  )
+
+benchmark_model <- benchmark_model[,`:=`(Segmento_R = {fifelse(Segmento %in% c("Camion Ligero Hasta 1.5", "Camion Ligero Hasta 3.5",
+                                                            "Camion Mediano Hasta 7.5", "Camion Ligero Hasta 1.5", "Desconocido"), "Camion", 
+                                            fifelse(Segmento %in% c("Auto Deportivo", "Auto Lujo", "Auto Subcompacto", "Auto Uso Multiple", "Auto Compacto"), "Auto Especial", Segmento))}
+                                         )]
+
+```
+
+\newpage
+
+Se observa que las categorías "Camión Ligero Hasta 1.5", "Camión Ligero Hasta 7.5", "Auto Deportivo" y "Desconocido" representan menos del 5% del total de los datos, lo que indica que la variable presenta una distribución desequilibrada entre sus categorías. Se identificó que las submarcas incluidas en la categoría "Desconocido" también están presentes dentro de las submarcas de camiones ligeros. Por esta razón, se decidió reagrupar todas las categorías relacionadas con camiones ligeros, incluyendo "Desconocido", en una sola categoría denominada "Camión Ligero". Que tiene vehículos como Ford F-150, Dodge Ram, y varios tipos de Pick Up.
+
+De forma similar, se creó una nueva categoría denominada "Auto", que agrupa todos los vehículos del tipo sedán como Chevrolet Spark, Audi Q8 y varios tipos de SUV.
+
+Estas nuevas categorías forman parte de una nueva variable recodificada, denominada "Segmento_R". Dado que cada una de las nuevas categorías presenta comportamientos distintos en relación con el precio del seguro, se decidió utilizar esta variable en los modelos de estimación.
+
+### 5.4.4 Elegibilidad para UBER
+
+Esta variable, identificada en la base de datos como "Elegibilidad_UBER", clasifica si el automóvil cotizado cumple con los criterios establecidos por la plataforma UBER en 2021 para prestar servicio de transporte privado. Según la información disponible en el sitio oficial de UBER, las características mínimas que debe cumplir un vehículo para ser considerado elegible son las siguientes:
+
++ No más de 10 años de antigüedad
++ Capacidad mínima para 4 pasajeros
++ Tener cinturones de seguridad para todos los pasajeross
++ Frenos ABS y bolsas de aire
++ Aire acondicionado
++ Radio AM/ FM
++ Estar en buenas condiciones y sin daños estéticos
++ No tener ningún emblema o calcomanías comerciales
+
+Alrededor del 32% de los automóviles cotizados (5,338 datos de 16,942) no pueden ser usados para la aplicación de transporte privado.
+
+\newpage
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Gráfica de Violín por Elegibilidad de UBER"}
+ggplot(benchmark_model, aes(x = as.factor(Elegible_UBER), y = QUA_Desc_Num)) + 
+    labs(x = "Elegibilidad UBER", y = "Precio del Seguro") + 
+    geom_violin(trim = FALSE, fill = "gray") +
+    geom_boxplot(width=0.1) + 
+    theme_classic() +
+  scale_y_continuous(labels = scales::dollar_format())
+
+nrow(benchmark_model)
+table(benchmark_model$Elegible_UBER)
+```
+
+
+Como se puede observar, los vehículos que no cumplen con los criterios de elegibilidad para UBER presentan, en promedio, un precio de seguro menor en comparación con aquellos que sí son elegibles. Además, se aprecia una relación positiva entre la elegibilidad para UBER y el precio del seguro. Esto resulta coherente, ya que los requisitos mínimos exigidos por la plataforma (como el modelo reciente, buenas condiciones mecánicas y características de confort) tienden a estar asociados con vehículos de mayor valor. A mayor valor del vehículo, es esperable que el costo del seguro también se incremente.
+
+Por esta razón, la variable Elegibilidad_UBER se incluirá en los modelos predictivos. No obstante, se reconoce la posible colinealidad con otras variables explicativas, dado que esta variable resume varias características del automóvil. Aun así, se decidió conservarla para no perder información relevante del perfil del vehículo, y se evaluará su significancia estadística dentro de los modelos para determinar si debe mantenerse o eliminarse durante el proceso de ajuste.
+
+
+### 5.4.5 Vehículo de Agencia o de Taller
+
+Esta variable se identifica en la base como "Agencia_Taller", indica si el automóvil cotizado proviene de un taller o de una agencia. Del total de 17,053 registros, el 17% corresponde a vehículos de agencia (2,729 observaciones), lo que sugiere que la variable se encuentra adecfuadamente distribuida entre sus categorías.
+
+Los automóviles adquiridos en taller son autos más antiguos, que se han reparado o que tienen desgaste, por lo que el costo de asegurarlo es menor. Por lo que se puede decir que esta variable es adecuada para poder predecir el comportamiento del precio del seguro y se decidió usar la variable.
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Gráfica de Violín por Techo Solar"}
+
+nrow(benchmark_model)
+table(benchmark_model$Agencia_Taller)
+```
+
+
+### 5.4.6 Techo Solar
+
+La variable se identifica como "QC". Esta variable identifica si el vehículo tiene techo solar (llamado también quemacocos). Toma el valor de $1$ si tiene esta característica y $0$ en otro caso. Alrededor del 70.31% (11,998 datos de 17,053) de los automóviles no tienen techo solar.
+
+\newpage
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Gráfica de Violín por Techo Solar"}
+ggplot(benchmark_model, aes(x = as.factor(QC), y = QUA_Desc_Num)) + 
+    labs(x = "Tiene Techo Solar", y = "Precio del Seguro") + 
+    geom_violin(trim = FALSE, fill = "gray") +
+    geom_boxplot(width=0.1) + 
+    theme_classic() + scale_x_discrete(guide = guide_axis(angle = 45)) +
+  scale_y_continuous(labels = scales::dollar_format())
+
+nrow(benchmark_model)
+table(benchmark_model$QC)
+```
+
+La distribución de precios para vehículos con techo solar es bimodal. Al hacer un prueba estadística t de comparación de medias se obtiene lo siguiente:
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+t.test(QUA_Desc_Num ~ QC, data = benchmark_model, var.equal = FALSE)
+t.test(QUA_Desc_Num ~ QC, data = benchmark_model, var.equal = TRUE)
+```
+
+| Tipo de Prueba t para Medias   | p-value |
+|:------------------------------:|:-------:|
+| Asumiendo varianzas iguales    | < 0.1%  |
+| Asumiendo varianzas desiguales | < 0.11% |
+Table: Resultados de la Prueba Estadística
+
+
+Dados los resultados de la prueba se concluye que existe una diferencia significativa en la media entre las categorías analizadas. En particular, la presencia de un techo solar suele implicar un costo adicional en el vehículo y es una característica común en autos de gama alta. Por lo tanto, se observa una relación entre la presencia de techo solar y el precio del seguro. Dado que esta variable muestra una asociación relevante con el objetivo del modelo, se decidió incluirla en el análisis.
+
+
+### 5.4.7 Frenos
+
+Esta variable se identifica en la base como "Frenos", donde "1" identifica si el automóvil tiene frenos tipo ABS (por sus siglas en inglés Anti-Lock Brake System) y ayuda a identificar el tipo de frenos del automóvil. Alrededor de 54% de los autos tienen frenos tipo ABS, y como la instalación de ese tipo de frenos tiene un costo se espera que tengan un precio superior. Se decidió usar esa variable ya que captura el comportamiento del precio del seguro.
+
+
+### 5.4.8 Número de Pasajeros del Automóvil
+
+La variable identificada en la base como "Pasajeros_5" es una variable dummy que identifica si el automóvil cotizado es de 5 pasajeros. Alrededor del 14.6% (2,485 datos de 17,053) de los vehículos cotizados no tienen la capacidad de tener 5 pasajeros por lo que la variable es balanceada. La variable se usa por que usualmente el número de asientos permite identificar el uso del vehículo y en consecuencia ayuda a predecir el precio.
+
+
+### 5.4.9 Volatilidad de la Zona
+
+Para la predicción del precio del seguro es importante considerar la ubicación del asegurado ya que hay factores exógenos al automóvil como la delincuencia, tipo de calle, costo de legislación entre otros que tienen impacto en el precio del seguro. Muchas compañías de seguros al calcular el precio toman en cuenta la ubicación (ya sea a nivel calle, municipio o código postal) del asegurado ya que el nivel de riesgo no es uniforme a lo largo del país. Por lo tanto se debe crear alguna variable que pueda capturar el nivel de riesgo de la ubicación. Se considerará crear una variable que se llamará "Zona_volatilidad" para que clasifique la desviación estándar del precio de seguro por municipio. 
+
+La siguiente gráfica es un mapa de calor que muestra un ejemplo de la desviación estándar del precio del seguro (que se llamará volatilidad) por municipio en función de la submarca y que se contemple el número de cotizaciones. La gráfica se hace con la intención de presentar el comportamiento del municipio entre submarcas. Se restringió a aquellos municipios que tienen una desviación estándar mayor a 500 con más de 20 cotizaciones para poder tener una mejor visualización.
+
+```{r, echo=FALSE, results = "hide", fig.cap = "Mapa de Calor por Municipio y Submarca", fig.height = 5, fig.width = 6}
+
+benchmark_train_municipio <- benchmark_model[, .(cotizacion_prom = mean(QUA_Desc_Num),
+                                                 desv_estandard = sd(QUA_Desc_Num),
+                                                 total_datos = .N),by = .(Municipio_D, Submarca_TP)]
+
+median <- median(benchmark_train_municipio[desv_estandard >= 500 & total_datos > 20 & Municipio_D %!in% "Desconocido",]$desv_estandard)
+
+ggplot(data = benchmark_train_municipio[desv_estandard >= 300 & total_datos > 20 & Municipio_D %!in% "Desconocido",], 
+        aes(x = Municipio_D, y = Submarca_TP, size = total_datos)) + 
+   geom_point(aes(color = desv_estandard)) + 
+   scale_color_gradient2(low = "green", mid = "yellow", high = "red", midpoint = 3500) +
+   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.key.size = unit(0.30, 'cm'), legend.title = element_text(size = 9)) + 
+   labs(x = "Municipio", y = "Submarca", color = "Desv. Estándard del\nPrecio del Seguro", size = "Total de Cotizaciones")
+
+
+benchmark_train_municipio[,':='(Zona_volatilidad = fifelse(is.na(desv_estandard) | desv_estandard == 0, "Nula",
+                                                           fifelse(0 < desv_estandard & desv_estandard <= 300, "Baja",
+                                                                   fifelse(300 < desv_estandard & desv_estandard <= 1300, "Media", "Alta"))),
+                                Llave = paste0(Municipio_D,"-",Submarca_TP))]
+
+
+zona_clasif <- unique(benchmark_train_municipio[,c("Llave", "Zona_volatilidad")])
+
+benchmark_model[, ':='(Llave = paste0(Municipio_D,"-",Submarca_TP))]
+
+benchmark_model[zona_clasif, on = 'Llave', Zona_volatilidad := i.Zona_volatilidad]
+
+benchmark_model[, ':='(Zona_volatilidad_Ord = factor(Zona_volatilidad, levels = c("Nula", "Baja", "Media", "Alta")))]
+
+```
+
+Como se observa en la gráfica anterior, existen varias submarcas que acumulan una alta volatilidad en el precio de su seguro dependiendo del municipio. Por ejemplo, dentro del municipio de Guadalajara hay mucha volatilidad en el precio de seguro de automóvil para la Chevrolet Suburban (tiene una desviación estándar arriba de 4 mil pesos dentro del municipio y menos de 50 cotizaciones). Este resultado puede deberse principalmente al alto índice de criminalidad en el estado de Jalisco ya que de acuerdo al archivo "Sistema Estadístico del Sector Asegurador del Ramo Automóviles" en ese estado durante 2021 se observó que el 0.97% de los vehículos asegurados eran robados. La cifra está dentro de los estados con mayor índice de robo en México y esta por encima del promedio nacional del 2021 (0.46%). Por lo que es probable que el seguro para ese estado tenga un gran variabilidad en el municipio donde se encuentra el asegurado. Adicionalmente, en 2021 en Puebla se observa que el 6.1% de los autos asegurados tiene reclamación de Responsabilidad Civil lo que lo ubica dentro de los 10 estados con mayores reclamaciones. 
+
+En comparación, la gráfica nos muestra que en la alcaldía de Benito Juárez en la Ciudad de México se tiene más cotizaciones (más de 50) del Honda CR-V pero se observa una menor variabilidad en el precio (menor a $2,000). Esto puede ser resultado de que esa alcaldía se encuentra de los estados con menor reporte de robos de automóvil de ese año.
+
+Ya que éste resultado parece coincidir con lo observado en el sector asegurador y parece discriminar adecuadamente la variabildad del precio del seguro por municipio se creará una variable haciendo uso de ésta información.
+
+Para poder usar la variabilidad por municipio se decidió capturar los cambios entre municipios es decir clasificar los municipios en función de la desviación estándar. La variable se llamó "Zona de Volatilidad" que clasifica la volatilidad de la siguiente forma:
+
+| Categoría | Desviación Estándar |
+|:---------:|:-------------------:|
+|    Nula   |          0          |
+|    Baja   |       (0, 300]      |
+|   Media   |     (300, 1300]     |
+|    Alta   |       (1300, $+\infty$]      |
+Table: Categorías de la Volatilidad de las Zonas
+
+Los cortes se hicieron de acuerdo a la variabildad obtenida al agrupar los municipios de manera ascendente con las submarcas de vehículos. Así mismo, se escogió una categoría llamada "Nula" para aquellos municipios donde sólo hay 1 cotización o su municipio no tiene variabilidad.
+
+Ya que el objetivo del modelo es poder predecir el precio del seguro de automóvil de acuerdo a las características del automóvil y de la ubicación del asegurado; entonces, en la aplicación del modelo existirán algunas combinaciones de municipio con submarca de vehículo que no han sido cotizados. Por ejemplo, si se quiere estimar el precio del seguro de automóvil para un asegurado en algún municipio que no se encontraba en la base de estimación el modelo no podrá hacer alguna inferencia. Para corregir esto se clasificará automáticamente como Zona de Volatildad "Media" a estos municipios no catalogados ya que en promedio los municipio tienen una zona de volatildad entre 300 y 1300.
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Gráfica de Violín por Zona de Volatidad"}
+ggplot(benchmark_model, aes(x = as.factor(Zona_volatilidad_Ord), y = QUA_Desc_Num)) + 
+    labs(x = "Categoría de Zona de Volatilidad", y = "Precio del Seguro") + 
+    geom_violin(trim = FALSE, fill = "gray") +
+    geom_boxplot(width=0.1) + 
+    theme_classic() + scale_x_discrete(guide = guide_axis(angle = 45)) +
+    scale_y_continuous(labels = scales::dollar_format())
+```
+
+\newpage
+
+Como se observa en la gráfica, la categoría de la variable si puede discernir entre los diferentes niveles de riesgo y observamos lo siguiente:
+
++ La categoría Nula tiene una distribución sesgada pero observamos un comportamiento similar a la distribución de precios general en términos de varianza. 
++ La categoría Baja tiene un distribución cuyos precios en promedio inferior a las demás con un comportamiento multimodal y una varianza baja.
++ La categoría Media tiene precios que en promedio están por arriba que la categoría Baja; sin embargo, tiene mayor varianza con un comportamiento bimodal.
++ La categoría Alta es la que tiene en promedio mayor costo en los precios del seguro, tiene una distribución mesocúrtica, tiene mayor varianza y es una distribución más estable.
+
+Aunque la categoría Nula y Alta tienen mayor número de outliers esta variable se usará ya que captura el nivel de riesgo por municipio y clasifica adecuadamente los precios de seguros de automóvil.
+
+### 5.4.10 Suma Asegurada
+
+La variable de Suma Asegurada (identificada como "SA_Siniestro" en la base) identifica la exposición del seguro. Abajo se encuentra una gráfica que muestra la relación entre esta variable y la variable objetivo.
+
+\newpage
+
+
+```{r, echo=FALSE, message = FALSE, fig.align = "center", fig.cap = "Gráfica de Correlación Precio y Suma Asegurada"}
+ggplot(data = benchmark_model, aes(x = SA_siniestro, y = QUA_Desc_Num)) +
+    geom_point() + 
+    labs(y = "Precio de Seguros", x = "Suma Asegurada") + 
+    theme_classic() + 
+    geom_smooth(mapping = aes(x = SA_siniestro, y = QUA_Desc_Num), se = FALSE, color = "blue") + geom_abline(color = "green", intercept = 0, slope = 1) + 
+    stat_cor(aes(label = after_stat(r.label)),
+             method = "pearson", 
+             label.x = 3, 
+             label.y = 30, 
+             cor.coef.name = "r") +
+    scale_x_continuous(labels = scales::dollar_format()) +
+    scale_y_continuous(labels = scales::dollar_format())
+```
+Como se observa en la gráfica, la correlación es superior al 66%, lo cual indica que la relación lineal entre la suma asegurada y el precio del seguro es alta. La línea verde es la identidad y la línea azul es de regresión (usando método de mínimos cuadrados ordinarios). Se concluye que existe una relación positiva entre ambas variables lo cual tiene sentido ya que el riesgo de un automóvil es fuertemente impactado por su costo. Además, conforme aumenta la suma asegurada aumenta la dispersión del precio del seguro ya que conforme aumente el costo del vehículo aumenta el riesgo y otros factores influyen en el riesgo. Es decir, una suma asegurada de 250 mil pesos no impacta mucho las características del asegurado o del vehículo, pero el costo de un seguro cuya suma asegurada es mayor a 500 mil pesos puede ser más sensible al modelo del automóvil o incluso a la ubicación del asegurado.
+
+Adicionalmente, se analizará la distribución de la suma asegurada.
+
+
+```{r, echo = FALSE, results = "hide", fig.align = "center", fig.cap = "Gráfica de Violín de la Suma Asegurada"}
+ggplot(benchmark_model, aes(x = "", y = SA_siniestro)) + 
+  labs(x = "", y = "Suma Asegurada") + 
+  geom_violin(trim = FALSE, fill = "gray") +
+  geom_boxplot(width = 0.1) +
+  ggtitle("") +
+  theme_classic() +
+  scale_y_continuous(labels = scales::dollar_format())
+```
+
+\newpage
+
+Se observa que se tiene una distribución multimodal.
+
+```{r, echo=FALSE, results = "hide"}
+#benchmark_model <- benchmark_model[1500000 >= SA_siniestro]
+```
+
+Adicionalmente, se evaluará si es necesario usar un término polinómico o una transformación logarítmica para poder tener un mejor ajuste de la suma asegurada.
+
+
+```{r, echo=FALSE, message = FALSE, fig.align = "center", fig.cap = "Correlación Suma Asegurada Término Cuadrado y Logarítmico"}
+graph_1 <- ggplot(data = benchmark_model, aes(x = SA_siniestro, y = QUA_Desc_Num)) +
+    geom_point() + 
+    labs(y = "Precio de Seguros (en miles)", x = "Suma Asegurada \n (en miles)") + 
+    theme_classic() + 
+    stat_smooth(method='lm', formula = y ~ poly(x, degree = 2), se = FALSE) + 
+    stat_cor(aes(label = after_stat(r.label)),
+             method = "pearson", cor.coef.name = "r") +
+  scale_x_continuous(labels = scales::dollar_format(scale = 0.001), guide = guide_axis(angle = 90)) +
+  scale_y_continuous(labels = scales::dollar_format(scale = 0.001)) 
+
+graph_2 <- ggplot(data = benchmark_model, aes(x = log(SA_siniestro), y = log(QUA_Desc_Num))) +
+    geom_point() + 
+    labs(y = "Logaritmo Precio de Seguros", x = "Logaritmo de \n Suma Asegurada") + 
+    theme_classic() + 
+    stat_smooth(method='lm', formula = y ~ poly(x, degree = 2), se = FALSE) + 
+    stat_cor(aes(label = after_stat(r.label)),
+             method = "pearson", cor.coef.name = "r")
+
+plot_grid(graph_1, graph_2)
+```
+
+
+En la gráfica de la izquierda la línea azul representa la regresión polinomial de grado 2, pero no se ve que la relación entre variables requiera usar este tipo de regresión ya que el coeficiente de correlación (67%) es inferior en 3% y sólo parece tener una relación lineal. Sin embargo, en la gráfica de la derecha se observa que la transformación logarítmica es más adecuada y tiene menor dispersión que usar una transformación lineal. Por lo tanto, por principio de parsimonía primero se considerará usar la suma asegurada de manera lineal en el modelo y después se hará una transformación logarítmica para identificar cual es el mejor ajuste.
+
+Finalmente, ya que se comprobó la relación lineal positiva entre la Suma Asegurada y el precio del seguro se usará ésta variable en el modelo. 
+
+### 5.4.11 Estado
+
+La variable identifica el Estado de vivienda del potencial asegurado. Así como se creó una variable para poder capturar aquellos factores exógenos que pueda impactar el cálculo del precio se decidió usar una variable más agregada que refleje el riesgo a nivel estado.
+
+En general cada estado tiene un comportamiento diferente. Pero, el Estado de México (llamado en los datos como México) y Jalisco tienen mayor varianza. Adicionalmente, el estado de Guanajuato tiene menor varianza que el resto. Finalmente, se decidió usar la variable ya que es información adicional respecto a la ubicación geográfica del asegurado que se puede usar en el modelo, y puede dar información general sobre el comportamiento de los precios en el país. Además, con el análisis de significancia se evaluará la permanencia de la variable.
+
+\newpage
+
+### 5.4.12 Tipo de Zona
+
+La variable Tipo de Zona se identifica en la base como "Tipo_Zona_R" y es el tipo de suelo de la dirección donde se realizó la cotización. Se clasifica de la siguiente manera:
+
++ Rural (10.3%).
++ Urbano y Semiurbano (77.3%).
++ Desconocido (12.4%).
+
+La variable tiene la siguiente distribución:
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Gráfica de Violín por Zona"}
+
+benchmark_model <- benchmark_model[,`:=`(Tipo_Zona_R = {fifelse(Tipo_Zona %in% c("Urbano", "Semiurbano"), "Urbano", Tipo_Zona)})]
+
+ggplot(benchmark_model, aes(x = as.factor(Tipo_Zona_R), y = QUA_Desc_Num)) + 
+    labs(x = "Tipo de Zona", y = "Precio del Seguro") + 
+    geom_violin(trim = FALSE, fill = "gray") +
+    geom_boxplot(width=0.1) + 
+    theme_classic() + scale_x_discrete(guide = guide_axis(angle = 45)) +
+  scale_y_continuous(labels = scales::dollar_format())
+
+nrow(benchmark_model)
+table(benchmark_model$Tipo_Zona)
+
+t.test(benchmark_model[Tipo_Zona_R == "Urbano"]$QUA_Desc_Num,
+       benchmark_model[Tipo_Zona_R == "Rural"]$QUA_Desc_Num, 
+       mu = 0)
+
+t.test(benchmark_model[Tipo_Zona_R == "Urbano"]$QUA_Desc_Num,
+       benchmark_model[Tipo_Zona_R == "Desconocido"]$QUA_Desc_Num, 
+       mu = 0)
+
+t.test(benchmark_model[Tipo_Zona_R == "Rural"]$QUA_Desc_Num,
+       benchmark_model[Tipo_Zona_R == "Desconocido"]$QUA_Desc_Num, 
+       mu = 0)
+
+nrow(benchmark_model)
+table(benchmark_model$Tipo_Zona_R)
+```
+De la gráfica se puede concluir que el tipo de suelo Desconocido es menos sesgada en comparación con las otras categorías. Así mismo, la categoría Rural tiene un sesgo positivo pero tiene un comportamiento más estable que el Urbano cuya distribución tiene evidencia de que los precios se acumulan en diferentes rangos. Para descartar que todas las categorías tengan la misma media se hizo una prueba estadística t para identificar si existe evidencia para asumir que las medias son diferentes. El resultado obtenido fue que entre las 3 categorías se tiene un $p-value$ inferior a 1% en todas las pruebas; por lo tanto, hay evidencia para asumir que las 3 categorías tienen diferente media y pueden ayudar a discriminar el precio del seguro. Finalmente, cuando el suelo es urbano en promedio el precio del seguro es mayor al del suelo Rural. Este efecto puede ser producto de que hay más cotizaciones donde el suelo es Urbano donde los automóviles son más usados lo cual eleva su nivel de riesgo.
+
+Ya que el tipo de suelo captura el comportamiento del precio del seguro se decidió agregar la variable.
+
+\newpage
+
+### 5.4.13 Carrocería
+
+Esta variable identifica el tipo de carrocería del vehículo cotizado y se identifica en la base como "Carroceria_R".
+
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Gráfica de Violín por Carrocería"}
+ggplot(benchmark_model, aes(x = as.factor(Carroceria_R), y = QUA_Desc_Num)) + 
+    labs(x = "Tipo de Carrocería", y = "Precio del Seguro") + 
+    geom_violin(trim = FALSE, fill = "gray") +
+    geom_boxplot(width=0.1) + 
+    theme_classic() + scale_x_discrete(guide = guide_axis(angle = 45)) +
+  scale_y_continuous(labels = scales::dollar_format())
+```
+Como se observa en la gráfica la distribución de precios del seguro varía entre el tipo de carrocería. Por ejemplo, la carrocería SUV es bimodal con poca varianza, en comparación con la carrocería OTROS que tiene más varianza y en promedio tiene el costo más alto de precios. Adicionalmente, la variable HB es la que tiene los menores costos en promedio.
+
+La variable al poder discriminar adecuadamente el precio del seguro de auto, se decidió agregar al modelo.
+
+
+### 5.4.14 Municipios Especiales
+
+Como se menciona en capítulos anteriores, el tipo de zona del asegurado tiene un impacto en el precio. Ya se construyó una variable que captura la variabilidad de los precios a nivel municipio. Pero no hemos hecho alguna variable que identifique si el asegurado pertenence a un municipio de la misma forma en la que se usó el estado del asegurado y su tipo de suelo. Esto fué por que la variable Municipio está muy desbalanceada.
+
+Por eso se propone crear una variable que identifique si el asegurado se encuentra en algún municipio cuya variabilidad sea particularmente alta. Se llamará en la base "Municipio_Riesgo" y tendrá la etiqueta de "$1$" si pertenece a un municipio especial y "$0$" en otro caso.
+
+\newpage
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.height = 5, fig.width = 6, fig.cap = "Promedio de Precio por Municipio y su Desviación Estándard"}
+benchmark_model_municipio <- benchmark_model[, .(cotizacion_prom = mean(QUA_Desc_Num) ,desv_estandard = sd(QUA_Desc_Num),
+                                                 total_datos = .N, cv = sd(QUA_Desc_Num) * 100 / mean(QUA_Desc_Num)), by =  .(Municipio_D)]
+
+ggplot(benchmark_model_municipio[desv_estandard >= 0 & total_datos > 150,], aes(x = reorder(as.factor(Municipio_D), -desv_estandard), y = cotizacion_prom)) + 
+    labs(x = "Municipio", y = "Precio promedio") + geom_bar(stat="identity") + geom_errorbar(aes(x=as.factor(Municipio_D), ymin=cotizacion_prom-desv_estandard, ymax=cotizacion_prom+desv_estandard)) +
+    theme_classic() + scale_x_discrete(guide = guide_axis(angle = 45)) +
+  scale_y_continuous(labels = scales::dollar_format())
+
+benchmark_model <- benchmark_model[,`:=`(Municipio_Riesgo = fifelse(Municipio_D %in% c("ZAPOPAN", "ATIZAPÁN DE ZARAGOZA", "GUADALAJARA", "NAUCALPAN DE JUAREZ", "TOLUCA", "MORELIA", "TORREÓN"), 1, 0))]
+
+benchmark_model <- benchmark_model[,`:=`(Submarca_TP_R = fifelse(Submarca_TP %in% c("OTROS-SUV", "SEAT-IBIZA", "MAZDA-MAZDA 3", "JEEP-GRAND CHEROKEE", "HONDA-CIVIC", "HONDA-HR-V", "TOYOTA-HILUX"), 1, 0))]
+
+table(benchmark_model$Municipio_Riesgo)/nrow(benchmark_model) * 100
+```
+
+Los municipios con una mayor variabilidad (identificada por las lineas negras) respecto a su precio promedio con cotizaciones mayores a 150 son:
+
++ Zapopan
++ Atizapán de Zaragoza
++ Guadalajara
++ Naucalpan de Juárez
++ Toluca
++ Morelia
++ Torreón
+
+Los municipios de arriba tienen una mayor volatilidad con respecto al resto por lo que se decidió crear la variable que se identificará en la base como "Municipio_Riesgo". Para esta variable se tiene que el 15.54% de las cotizaciones pertenece a alguno de estos municipios por lo que no es desbalanceada. La variable se incluyó ya que puede ser adecuada para predecir el precio del seguro.
+
+\newpage
+
+
+## 5.5 Preparación de Modelos
+
+Para la elaboración de los modelos se dividieron los datos en 2 partes:
+
++ El 80% de los datos se usarán para entrenar el modelo
++ El 20% de los datos restantes para validarlo
+
+Para la validación se usarán los parámetros obtenidos durante el entrenamiento del modelo y se usarán los datos de validación para estimar la diferencia entre el precio del seguro estimado contra el precio del seguro real. Esta comparación es importante ya que nos permite obtener un grado de error del modelo cuando se usa con datos los cuales no fueron usados para estimar el parámetro, y así obtener una medida adecuada de su utilidad.
+
+Para poder tener una mejor comparación entre los modelos se decidió estimar del de menor complejidad al mayor, por lo que se usarán las siguientes 3 metodologías:
+
++ Modelo Lineal
++ Modelo Lineal Generalizado
++ XGradient Boosting
+
+El siguiente capítulo describirá la forma de evaluar las metodología así como las métricas finales de comparación.
+
+## 5.6 Estimación de los Modelos
+
+Como se ha mencionado anteriormente, en este capítulo se hará la estimación de los modelos. Se comenzará con las metodologías más usuales y más usadas que son los Modelos Lineales y Modelos Lineales Generalizados (usando regresión Gamma). Después de esas estimaciones se preparará la técnica de XGradient Boosting.
+
+Aunque las métricas comparativas entre cada modelo se describieron en el capítulo anterior se decidió hacer análisis adicionales en cada modelo. Por ejemplo, para el modelo lineal se hará el análisis de sus supuestos. Esto se hace con la finalidad de tener el mejor modelo para comparar.
+
+
+### 5.6.1 Modelo Lineal
+
+Para el modelo lineal se usó la función $lm$ de R. Como se mencionó en capítulos anteriores se ajustará el modelo lineal y primero se evaluará si todas las variables fueron significativas.
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+
+# Se divide la tabla
+set.seed(123)
+train <- sample(nrow(benchmark_model), round(0.8 * nrow(benchmark_model)), replace = FALSE)
+benchmark_train <- benchmark_model[train, ]
+benchmark_validate <- benchmark_model[-train, ]
+#benchmark_validate[, Zona_volatilidad_Ord := "Media"]
+
+
+model_1_train <- lm(QUA_Desc_Num ~ Modelo + Moneda + Segmento_R + Elegible_UBER + Agencia_Taller + QC + Frenos +
+                                   Pasajeros_5 + Zona_volatilidad_Ord + SA_siniestro + Estado + 
+                                   Tipo_Zona_R + Municipio_Riesgo + Marca_TP_R + Carroceria_R,
+                                   data = benchmark_train)
+summary(model_1_train)
+
+```
+
+La estimación lineal se obtuvo una $R^2-ajustada$ de 77% y las siguientes variables no fueron estadísticamente significativas:
+
+|              Variable               |   p-valor     |
+|:---------------------------:|:------:|
+| **Zona Volatilidad-"Baja"** | 50% |
+| **Carroceria-"SEDAN"** | 23.32% |
+
+Table: Análisis de Permanencia de Variables
+
+Del resumen del modelo se obtuvo que la categoría "Zona Volatildad Baja", "Auto Uso Múltiple", y "Carroceria-"SEDAN"" no son significativas. Sin embargo, las variables con más de una categoría y que sólo 1 de ellas no fue significativas se conservarán ya que se desea preservar en el modelo el mayor número de características del automóvil o del asegurado. Finalmente, al tener una $R^2-ajustada$ de 77% indica que el modelo explica aproximadamente más de 3 cuartas partes de la varianza (o que el modelo es 77% mejor que el promedio) lo cual es un ajuste adecuado.
+
+\newpage
+
+Procedemos a hacer el análisis de los supuestos de la regresión.
+
+
+```{r, echo=FALSE, message = FALSE, fig.height=5, fig.width=6, fig.cap = "Análisis de Supuestos del Modelo Lineal"}
+
+# Se divide la tabla
+par(mfrow = c(2, 2))
+plot(model_1_train)
+
+```
+
+De las gráficas anteriores se observa que:
+
++ No se observa independencia entre los residuos y las variables explicativas, ya que los residuos tienden a aumentar a medida que lo hacen los valores ajustados. Esto indica que no se cumple el supuesto de homocedasticidad, lo cual puede afectar la validez de la predicción del modelo.
++ Los residuos del modelo no siguen una distribución Normal; sin embargo, su distribución es bastante simétrica.
++ Se observan algunos outliers.
++ No se observa evidencia de varianza constante.
+
+Dado el comportamiento de la gráfica, no se hacen pruebas de hipótesis para verificar las conclusiones.
+
+\newpage
+
+Así mismo al calcular las métricas de error en la base de validación se obtiene lo siguiente:
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+
+predict_model_1 <- predict(model_1_train, benchmark_validate[,c("Modelo", "Moneda", "Segmento_R", 
+                                                                "Elegible_UBER","Agencia_Taller",
+                                                                "QC","Estado", "Frenos", "Tipo_Zona_R",
+                                                                "Pasajeros_5", "Zona_volatilidad_Ord", "SA_siniestro",
+                                                                "Frenos", "Municipio_Riesgo", "Marca_TP_R", "Carroceria_R")])
+
+dif_abs_model_1 <- mean(abs(predict_model_1 - benchmark_validate$QUA_Desc_Num))
+dif_porc_model_1 <- mean(abs((predict_model_1 - benchmark_validate$QUA_Desc_Num)/benchmark_validate$QUA_Desc_Num))
+eam_model_1 <- sqrt(mean((predict_model_1 - benchmark_validate$QUA_Desc_Num) ^ 2))
+
+dif_abs_model_1
+dif_porc_model_1
+eam_model_1
+
+```
+| EPAM   | EAM    | ECM    |
+|:------:|:------:|:------:|
+| 13.42% | \$1,231 | \$1,835 |
+Table: Métricas de Validación para el Modelo Lineal
+
+
+De los resultados obtenidos podemos concluir que el modelo lineal se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 13.88% que representa alrededor de $\$1,231$. Además, el $ECM$ indica que en promedio el modelo tiene una desviación de $\$1,835$ de los datos reales.
+
+Finalmente procedemos a hacer un análisis sobre los residuos estimados.
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
+
+plot(predict_model_1, benchmark_validate$QUA_Desc_Num, 
+     xlab = "Valores Estimados (Base Validación)", 
+     ylab = "Valores Reales", xaxt = 'n', yaxt = 'n')
+abline(0,1)
+axis(1, at = pretty(predict_model_1), labels = paste0("$", pretty(predict_model_1)), las = 0.5)
+axis(2, at = pretty(benchmark_validate$QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$QUA_Desc_Num)), las = 0.5) 
+```
+
+
+
+La gráfica hace una comparación entre los valores estimados contra los valores reales de la base de validación. Se observa que el modelo crea la relación lineal; sin embargo, existe una alta variabilidad entre los resultados así mismo entre más grande los valores estimados se observa mayor separación entre el precio real del seguro contra el estimado. 
+
+Como se mencionó en capítulos anteriores, se buscará tener un mejor resultado al transformar logaritmicamente la variable dependiente y la Suma Asegurada de la variable independiente para poder tener un modelo con menos varianza en los residuos. Se usarán las mismas variables.
+
+```{r, echo=FALSE, message = FALSE, results = 'hide'}
+
+model_1_train_log <- lm(Log_QUA_Desc_Num ~ Modelo + Moneda + Segmento_R + Elegible_UBER + Agencia_Taller + QC + Frenos +
+                                           Pasajeros_5 + Zona_volatilidad_Ord + Log_Siniestro_SA + Estado + 
+                                           Tipo_Zona_R + Municipio_Riesgo + Marca_TP_R + Carroceria_R,
+                         data = benchmark_train)
+
+summary(model_1_train_log)
+```
+
+Al estimar el modelo con transformación logarítmica se obtuvo una $R^2-ajustada$ de 81% y las siguientes variables no fueron estadísticamente significativas:
+
+\newpage
+
+|             Variable                |   p-valor     |
+|:---------------------------:|:------:|
+| **Frenos-"Desconocido"** | 30.6% |
+Table: Análisis de Permanencia de Variables
+
+
+Comparado con el modelo sin transformación logarítmica podemos concluir que existe una mejora en la estimación ya que tenemos una métrica $R^2-ajsutada$ mayor y sólo tres variables no son significativas.
+
+Analizando el modelo de la regresión con transformación logarítmica obtenemos lo siguiente.
+
+```{r, echo=FALSE, message = FALSE, fig.height=5, fig.width=6, fig.cap = "Análisis de Supuestos del Modelo Lineal"}
+
+# Se divide la tabla
+par(mfrow = c(2, 2))
+plot(model_1_train_log)
+```
+
+Como se observa en la gráficas anteriores se observa que:
+
++ Los residuos no siguen una distribución Normal, aunque es muy simétrica.
++ Se cumple el supuesto de independencia (variables son independientes de los residuos).
++ No se observan más que 3 posibles outliers.
++ Hay evidencia que el modelo tiene varianza constante.
+
+Dado el comportamiento de la gráfica, no se hacen pruebas de hipótesis para verificar las conclusiones.
+
+Volveremos a calcular las métricas de error se obtiene lo siguiente.
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+predict_model_1_log <- predict(model_1_train_log, benchmark_validate[,c("Modelo", "Moneda", "Segmento_R", 
+                                                                "Elegible_UBER","Agencia_Taller",
+                                                                "QC","Estado", "Frenos", "Tipo_Zona_R",
+                                                                "Pasajeros_5", "Zona_volatilidad_Ord", "Log_Siniestro_SA",
+                                                                "Frenos", "Municipio_Riesgo", "Marca_TP_R", "Carroceria_R")])
+
+
+dif_abs_model_1_log <- mean(abs(exp(predict_model_1_log) - benchmark_validate$QUA_Desc_Num))
+dif_porc_model_1_log <- mean(abs((exp(predict_model_1_log) - benchmark_validate$QUA_Desc_Num)/benchmark_validate$QUA_Desc_Num))
+eam_model_1_log <- sqrt(mean((exp(predict_model_1_log) - benchmark_validate$QUA_Desc_Num) ^ 2))
+
+dif_abs_model_1_log
+dif_porc_model_1_log
+eam_model_1_log
+```
+
+| EPAM   | EAM    | ECM    |
+|:------:|:------:|:------:|
+| 11.80% | \$1,136 | \$1,764 |
+Table: Métricas de Validación para el Modelo Lineal con Transformación Logarítmica
+
+De los resultados obtenidos podemos concluir que el modelo lineal se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 11.8% que representa alrededor de $\$1,136$. Además, el $ECM$ indica que en promedio el modelo tiene una desviación de $\$1,764$ de los datos reales. La transformación logarítmica no aumenta de manera significativa el poder predictivo del modelo. Sin embargo, ofrece un mejor ajuste en términos de $R^2-ajustada$ y se logra cumplir el supuesto de independencia.
+
+Finalmente procedemos a hacer un análisis sobre los residuos estimados.
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
+plot(exp(predict_model_1_log), benchmark_validate$QUA_Desc_Num, 
+     xlab = "Valores Estimados (Base Validación)", 
+     ylab = "Valores Reales", xaxt = 'n', yaxt = 'n')
+abline(0,1)
+axis(1, at = pretty(exp(predict_model_1_log)), labels = paste0("$", pretty(exp(predict_model_1_log))), las = 0.5)
+axis(2, at = pretty(benchmark_validate$QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$QUA_Desc_Num)), las = 0.5) 
+```
+De manera similar al modelo sin transformación existe una relación lineal entre la estimación con los valores reales y los estimados, pero los valores estimados más grandes siguen teniendo mayor variabilidad con el valor real.
+
+El modelo lineal sin transformación es heterocedastico y no hay evidencia significativa de que sus residuos provengan de una distribución Normal con media 0. Sin embargo, el modelo con transformación logarítmica cumple con los mismos supuestos que el modelo sin transformación y tiene una $R^2-ajustada$ superior lo que nos indica que explica más la varianza del precio del seguro de automóvil. Finalmente, al hacer una comparación con las métricas de validación observamos lo siguiente:
+
+| Modelo                     | EAM    | EPAM     | ECM     |
+|:--------------------------:|:-------:|:-------:|:-------:|
+| Sin Transformación         | \$1,231 |  13.42% | \$1,835 |
+| Transformación Logarítmica | \$1,136 | 11.80%  | \$1,764 |
+Table: Comparativa de Métricas de Validación
+
+De las métricas de error se concluye que el modelo con mayor poder predictivo en promedio es el que estima el precio del seguro del automóvil de manera logarítmica. Al hacer una comparación usando la métrica del coeficiente de información bayesiano (CIB) se obtiene lo siguiente (esa métrica se usó ya que penaliza el número de variables):
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+BIC(model_1_train)
+BIC(model_1_train_log)
+
+```
+
+
+| Modelo                     | CIB       |
+|:--------------------------:|:---------:|
+| Sin Transformación         | 242, 431  |
+| Transformación Logarítmica | -11, 415 |
+Table: Comparativa de Coeficientes de Información
+
+
+De acuerdo a ésta métrica concluimos que el modelo con mejor ajuste es el que transforma logarítmicamente la variable dependiente y ya que nos estamos enfocando en obtener un modelo que tenga un poder predictivo superior concluimos que se usará el modelo con transformación logarítmica para poder compararlo con el resto de propuestas metodológicas.
+
+
+### 5.6.2 Modelo Lineal Generalizado
+
+Para el modelo lineal se usó la función $glm$ de R con una distribución Gamma y la liga identidad. La función Gamma se seleccionó ya que los precios son positivos, tiene un sesgo similar y es una distribución muy usada en el área de los seguros. Como se mencionó en capítulos anteriores se ajustará el Modelo Lineal Generalizado y primero se evaluará si todas las variables fueron significativas.
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+
+# Se divide la tabla
+model_2_train <- glm(QUA_Desc_Num ~ Modelo + Moneda + Segmento_R + Elegible_UBER + Agencia_Taller + QC + Frenos +
+                       Pasajeros_5 + Zona_volatilidad_Ord + SA_siniestro + Tipo_Zona_R + Carroceria_R + 
+                       Municipio_Riesgo + Marca_TP_R + Estado,
+                     data = benchmark_train,
+                     family = "Gamma" (link = 'identity'))
+
+summary(model_2_train)
+
+```
+De la estimación lineal generalizada se obtuvo un Coeficiente de Información de Akaike (AIC) de $234,288$ y se observó que sólo 1 variable no fué significativa:
+
+|              Variable               |   p-valor     |
+|:---------------------------:|:------:|
+| **Frenos-"1"** | 20.5% |
+Table: Análisis de Permanencia de Variables
+
+
+La variable "Frenos" no es significativa cuando es la categoría "1" (el vehículo tiene frenos tipo ABS).
+
+Se calcularon las métricas comparativas para evaluar el tipo de ajuste.
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+predict_model_2 <- predict(model_2_train, benchmark_validate[,c("Modelo", "Moneda", "Segmento_R", "Elegible_UBER","Agencia_Taller", 
+                                                                "QC","Frenos", "Tipo_Zona_R", "Carroceria_R",
+                                                                "Grado_Pobreza","Pasajeros_5", "Zona_volatilidad_Ord", "SA_siniestro",
+                                                                "Siniestro_SA_2","Frenos", "Municipio_Riesgo", "Marca_TP_R", "Estado")])
+
+dif_abs_model_2 <- mean(abs(predict_model_2 - benchmark_validate$QUA_Desc_Num))
+dif_porc_model_2 <- mean(abs((predict_model_2 - benchmark_validate$QUA_Desc_Num)/benchmark_validate$QUA_Desc_Num))
+eam_model_2 <- sqrt(mean((predict_model_2 - benchmark_validate$QUA_Desc_Num) ^ 2))
+
+dif_abs_model_2
+dif_porc_model_2
+eam_model_2
+
+```
+
+| EPAM   | EAM    | ECM    |
+|:------:|:------:|:------:|
+| 12.8% | \$1,207 | \$1,852 |
+Table: Métricas de Validación del Modelo Lineal Generalizado
+
+
+De los resultados obtenidos podemos concluir que el Modelo Lineal Generalizado se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 12.8% que representa alrededor de $\$1,207$. Además, el $ECM$ indica que en promedio el modelo tiene una desviación de $\$1,852$ de los datos reales.
+
+\newpage
+
+Finalmente procedemos a hacer un análisis sobre los residuos estimados.
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
+plot(predict_model_2, benchmark_validate$QUA_Desc_Num, 
+     xlab = "Valores Estimados (Base Validación)", 
+     ylab = "Valores Reales", xaxt = 'n', yaxt = 'n')
+abline(0,1)
+axis(1, at = pretty(predict_model_2), labels = paste0("$", pretty(predict_model_2)), las = 0.5)
+axis(2, at = pretty(benchmark_validate$QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$QUA_Desc_Num)), las = 0.5) 
+```
+
+Aunque sí existe una relación lineal entre los valores estimados y los reales pero se observa que los resultados para precios grandes sigue muy dispersa.
+
+De manera similar al modelo lineal, se decidió transformar logaritmicamente la variable dependiente y la Suma Asegurada de la variable independiente para poder tener un modelo más estable. Adicionalmente, se removió la variable "Frenos" para que todas las variables sean significativas. Además, se agregó el cuadrado del logaritmo.
+
+Al estimar el modelo con transformación logarítmica (se usó una función enlace logarítmica) se obtuvo un Coeficiente de Información de Akaike (AIC) de $234,358$ con todas las variables significativas y es inferior al modelo sin transformación
+
+
+```{r, echo=FALSE, message = FALSE, results = 'hide'}
+
+model_2_train_log <- glm(QUA_Desc_Num ~ Modelo + Moneda + Segmento_R + Elegible_UBER + Agencia_Taller + QC + Frenos +
+                           Pasajeros_5 + Zona_volatilidad_Ord + Log_Siniestro_SA + Log_Siniestro_SA_2 + Estado + 
+                           Tipo_Zona_R + Carroceria_R + Municipio_Riesgo + Marca_TP_R,
+                         data = benchmark_train,
+                         family = "Gamma" (link = 'log'))
+
+summary(model_2_train_log)
+
+```
+
+De la estimación anterior se obtuvo un Coeficiente de Información de Akaike (AIC) de $232,750$ y se observó que sólo 2 variable no fué significativa:
+
+|              Variable               |   p-valor     |
+|:---------------------------:|:------:|
+| **Frenos-"Desconocido"** | 11.2% |
+| **Carroceria_R-"OTROS"** | 60% |
+Table: Análisis de Permanencia de Variables
+
+Se calcularon las métricas comparativas para evaluar el tipo de ajuste.
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+predict_model_2_log <- predict(model_2_train_log, benchmark_validate[,c("Modelo", "Moneda", "Segmento_R", 
+                                                                        "Elegible_UBER","Agencia_Taller", "Log_Siniestro_SA",
+                                                                        "QC","Estado", "Frenos", "Tipo_Zona_R", "Carroceria_R",
+                                                                        "Grado_Pobreza","Pasajeros_5", "Zona_volatilidad_Ord",
+                                                                        "Log_Siniestro_SA_2","Frenos", "Municipio_Riesgo", "Marca_TP_R")])
+
+dif_abs_model_2_log <- mean(abs(exp(predict_model_2_log) - benchmark_validate$QUA_Desc_Num))
+dif_porc_model_2_log <- mean(abs((exp(predict_model_2_log) - benchmark_validate$QUA_Desc_Num)/benchmark_validate$QUA_Desc_Num))
+eam_model_2_log <- sqrt(mean((exp(predict_model_2_log) - benchmark_validate$QUA_Desc_Num) ^ 2))
+
+dif_abs_model_2_log
+dif_porc_model_2_log
+eam_model_2_log
+```
+
+
+| EPAM   | EAM    | ECM    |
+|:------:|:------:|:------:|
+| 12% | \$1,137 | \$1,757 |
+Table: Métricas de Validación el Modelo Lineal Generalizado con Transformación Logarítmica
+
+
+De los resultados obtenidos podemos concluir que el Modelo Lineal Generalizado con transformación logarítmica se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 12% que representa alrededor de $\$1,137$. Además, el $ECM$ indica que en promedio el modelo tiene una desviación de $\$1,757$ de los datos reales. La transformación logarítmica no aumenta de manera significativa el poder predictivo del modelo.
+
+Finalmente procedemos a hacer un análisis sobre los residuos estimados del modelo con transformación logarítmica.
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
+plot(exp(predict_model_2_log), benchmark_validate$QUA_Desc_Num, 
+     xlab = "Valores Estimados (Base Validación)", 
+     ylab = "Valores Reales",
+     xaxt = 'n', yaxt = 'n') 
+abline(0,1)
+axis(1, at = pretty(exp(predict_model_2_log)), labels = paste0("$", pretty(exp(predict_model_2_log))), las = 0.5)
+axis(2, at = pretty(benchmark_validate$QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$QUA_Desc_Num)), las = 0.5) 
+
+```
+Existe una relación lineal entre la estimación con los valores reales y estimados, pero los valores estimados más grandes siguen teniendo mayor variabilidad con el valor real, pero ya es menor la dispersión lo que indica que la transformación logarítmica fué adecuada para tener resultados más estables.
+
+Para ambos modelos se puede identificar que la distribución gamma fué una buena estimación ya que nos dió resultados más precisos que el modelo lineal. Además, la transformación logarítmica ofrece mejores resultados en términos de coeficientes de información. Ambas nos indican que es posible que los resultados sean precisos. Finalmente, al hacer una comparación con las métricas de validación observamos lo siguiente:
+
+| Modelo                     | EPAM    | EAM     | ECM     |
+|:--------------------------:|:-------:|:-------:|:-------:|
+| Sin Transformación         | 12.8% |  \$1,207 | \$1,852 |
+| Transformación Logarítmica | 12% | \$1,137  | \$1,757 |
+Table: Comparativa de Métricas de Validación
+
+Aunque el modelo con transformación logarítmica ofrece resultados más estables la predicción no mejora significativamente, pero al coeficiente de información es menor lo cual significa que tiene mejor ajuste. En conclusión el modelo con transformación logarítmica se usará para compararlo contra el resto de metodologías. 
+
+
+### 5.6.3 Modelo XGradient Boosting
+
+Para el modelo lineal se usó la función $xgboost$ con la paquetería de $xgboost$ de R. Para éste modelo el valor de los hiperparámetros es crucial. Aunque el modelo tiene muchos hiperparámetros (como los que se presentaron en el capítulo 3.2) se decidió enfocarse en los siguientes que se consideran los principales y hay más guía sobre como encontrarlos:
+
++ $nrounds$, número máximo de iteraciones del algoritmo. Limitado a ser mayor o igual a $1$.
++ $eta$, la tasa de aprendizaje del modelo que está entre $0$ y $1$. La documentación de la función en $R$ indica que mientras el valor sea más cercano a 0 se tiene un modelo con menos sobre ajuste. Además, entre más bajo sea también se debe aumentar el número de iteraciones. Su valor por defecto es $0.3$.
++ $max\_depth$, es la profundidad de los árboles que generará. Su valor por defecto es $6$.
+
+Para poder ajustar los hiperparámetros se decidió evaluar el modelo usando varios modelos con los cuales se puede identificar el mejor rendimiento.
+
+El conjunto de hiperparámetros seleccionados fué:
+
++ $nrounds$ se harán iteraciones entre $400$, $500$ y $600$.
+
++ $eta$, se probaron iteraciones entre $0.05$ y $1$ con aumentos de $0.05$. Esto se hizo para evitar que el modelo tenga sobreajuste.
+
++ $max\_depth$, se dejó fijo en $1$ y se irá aumentando hasta que el ajuste deje de mejorar.
+
+Lo que se hará es evaluar el modelo con cada parámetro y seleccionar el mejor en función del Error Cuadrático Medio. Esto se hace con la función de $trainControl$ del paquete $caret$ que hace Cross Validation con el Error Cuadrático Medio para encontrar los parámetros que minimicen esa función objetivo. Una vez encontrados los parámetros óptimos se evaluará el modelo con las métricas de validación y se aumentará en $1$ el parámetro de $max\_depth$ hasta que no haya mejora significativa en las métricas. Finalmente, se usaron todas las variables de los capítulos anteriores y se transformó la variable objetivo ya que se ha observado en los capítulos anteriores que tiene el mejor comportamiento.
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+# Se divide la tabla
+set.seed(123)
+xg_benchmark_train <- benchmark_train[,c("Log_QUA_Desc_Num","Moneda", "Segmento_R", 
+                                         "Elegible_UBER","Agencia_Taller",
+                                         "QC","Estado", "Tipo_Zona_R",
+                                         "Pasajeros_5", "Zona_volatilidad_Ord", "Log_Siniestro_SA", 
+                                         "Log_Siniestro_SA_2", "Municipio_Riesgo", "Modelo","Marca_TP_R",  
+                                         "Carroceria_R")]
+
+
+xg_benchmark_validate <- benchmark_validate[,c("Log_QUA_Desc_Num","Moneda", "Segmento_R", 
+                                               "Elegible_UBER","Agencia_Taller",
+                                               "QC","Estado", "Tipo_Zona_R",
+                                               "Pasajeros_5", "Zona_volatilidad_Ord", "Log_Siniestro_SA", "Log_Siniestro_SA_2",
+                                               "Municipio_Riesgo", "Modelo","Marca_TP_R", "Carroceria_R")]
+
+
+xg_benchmark_train <- fastDummies::dummy_cols(xg_benchmark_train, select_columns = c("Moneda", "Segmento_R", 
+                                                                                     "Elegible_UBER","Agencia_Taller",
+                                                                                     "QC","Estado", "Tipo_Zona_R",
+                                                                                     "Pasajeros_5", "Zona_volatilidad_Ord",
+                                                                                     "Municipio_Riesgo","Marca_TP_R", 
+                                                                                     "Carroceria_R", "Modelo")
+                                              , remove_first_dummy = TRUE)
+
+xg_benchmark_train <- xg_benchmark_train[,-c("Moneda", "Segmento_R", 
+                                             "Elegible_UBER","Agencia_Taller",
+                                             "QC","Estado", "Tipo_Zona_R",
+                                             "Pasajeros_5", "Zona_volatilidad_Ord",
+                                             "Municipio_Riesgo","Marca_TP_R", "Carroceria_R", "Modelo")]
+
+
+xg_benchmark_validate <- fastDummies::dummy_cols(xg_benchmark_validate, select_columns = c("Moneda", "Segmento_R", 
+                                                                                           "Elegible_UBER","Agencia_Taller",
+                                                                                           "QC","Estado", "Tipo_Zona_R",
+                                                                                           "Pasajeros_5", "Zona_volatilidad_Ord",
+                                                                                           "Municipio_Riesgo","Marca_TP_R", 
+                                                                                           "Carroceria_R", "Modelo")
+                                                 , remove_first_dummy = TRUE)
+
+xg_benchmark_validate <- xg_benchmark_validate[,-c("Moneda", "Segmento_R", 
+                                                   "Elegible_UBER","Agencia_Taller",
+                                                   "QC","Estado", "Tipo_Zona_R",
+                                                   "Pasajeros_5", "Zona_volatilidad_Ord",
+                                                   "Municipio_Riesgo", "Marca_TP_R", "Carroceria_R", "Modelo")]
+
+
+
+dtrain <- xgb.DMatrix(data = data.matrix(xg_benchmark_train[,-c("Log_QUA_Desc_Num")]),
+                      label = data.matrix(xg_benchmark_train[, c("Log_QUA_Desc_Num")]))
+
+
+dtest <-xgb.DMatrix(data = data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]),
+                    label = data.matrix(xg_benchmark_validate[, c("Log_QUA_Desc_Num")]))
+
+
+
+# -1 Iteración
+# Using Expand.grid
+train_grid <- expand.grid(max_depth = 1, 
+                          nrounds = c(400, 500, 600),
+                          eta = seq(from = 0.05, to = 1, by = 0.05), 
+                          gamma = 0,
+                          subsample = 1,
+                          min_child_weight = 1,
+                          colsample_bytree = 0.6)
+
+dtrain_y <- benchmark_train$Log_QUA_Desc_Num
+
+train_control <- trainControl(method = "cv",
+                              number = 5,
+                              search = "grid")
+
+#model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
+
+# Tarda mucho pero el mejor modelo es
+# RMSE was used to select the optimal model using the smallest value.
+# The final values used for the model were nrounds = 600, max_depth = 3, eta = 0.95, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+
+
+mode_6 <- xgboost(data = dtrain, 
+                  verbose = 1, 
+                  nrounds = 600, 
+                  eta = 1, 
+                  max_depth = 1)
+
+predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
+
+
+dif_abs_model_6_min_1 <- mean(abs(exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)))
+dif_porc_model_6_min_1 <- mean(abs((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num))/exp(benchmark_validate$Log_QUA_Desc_Num)))
+eam_model_6_min_1 <- sqrt(mean((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)) ^ 2))
+
+dif_abs_model_6_min_1
+dif_porc_model_6_min_1
+eam_model_6_min_1
+
+# Zero Iteración
+# Using Expand.grid
+train_grid <- expand.grid(max_depth = 2, 
+                          nrounds = c(400, 500, 600),
+                          eta = seq(from = 0.05, to = 1, by = 0.05), 
+                          gamma = 0,
+                          subsample = 1,
+                          min_child_weight = 1,
+                          colsample_bytree = 0.6)
+
+dtrain_y <- benchmark_train$Log_QUA_Desc_Num
+
+train_control <- trainControl(method = "cv",
+                              number = 5,
+                              search = "grid")
+
+#model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
+
+# Tarda mucho pero el mejor modelo es
+# RMSE was used to select the optimal model using the smallest value.
+# The final values used for the model were nrounds = 600, max_depth = 3, eta = 0.95, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+
+
+mode_6 <- xgboost(data = dtrain, 
+                  verbose = 1, 
+                  nrounds = 600, 
+                  eta = 0.95, 
+                  max_depth = 2)
+
+predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
+
+
+dif_abs_model_6_0 <- mean(abs(exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)))
+dif_porc_model_6_0 <- mean(abs((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num))/exp(benchmark_validate$Log_QUA_Desc_Num)))
+eam_model_6_0 <- sqrt(mean((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)) ^ 2))
+
+dif_abs_model_6_0
+dif_porc_model_6_0
+eam_model_6_0
+
+# Primera Iteración
+# Using Expand.grid
+train_grid <- expand.grid(max_depth = 3, 
+                          nrounds = c(400, 500, 600),
+                          eta = seq(from = 0.05, to = 1, by = 0.05), 
+                          gamma = 0,
+                          subsample = 1,
+                          min_child_weight = 1,
+                          colsample_bytree = 0.6)
+
+dtrain_y <- benchmark_train$Log_QUA_Desc_Num
+
+train_control <- trainControl(method = "cv",
+                              number = 5,
+                              search = "grid")
+
+#model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
+
+# Tarda mucho pero el mejor modelo es
+# RMSE was used to select the optimal model using the smallest value.
+# The final values used for the model were nrounds = 600, max_depth = 3, eta = 0.55, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+
+
+mode_6 <- xgboost(data = dtrain, 
+                  verbose = 1, 
+                  nrounds = 600, 
+                  eta = 0.55, 
+                  max_depth = 3)
+
+predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
+
+
+dif_abs_model_6_1 <- mean(abs(exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)))
+dif_porc_model_6_1 <- mean(abs((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num))/exp(benchmark_validate$Log_QUA_Desc_Num)))
+eam_model_6_1 <- sqrt(mean((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)) ^ 2))
+
+dif_abs_model_6_1
+dif_porc_model_6_1
+eam_model_6_1
+
+
+# Segunda iteración
+# Using Expand.grid
+train_grid <- expand.grid(max_depth = 4, 
+                          nrounds = c(400, 500, 600),
+                          eta = seq(from = 0.05, to = 1, by = 0.05), 
+                          gamma = 0,
+                          subsample = 1,
+                          min_child_weight = 1,
+                          colsample_bytree = 0.6)
+
+dtrain_y <- benchmark_train$Log_QUA_Desc_Num
+
+train_control <- trainControl(method = "cv",
+                              number = 5,
+                              search = "grid")
+
+#model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
+
+# Tarda mucho pero el mejor modelo es
+# RMSE was used to select the optimal model using the smallest value.
+# The final values used for the model were nrounds = 600, max_depth = 4, eta = 0.45, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+
+
+mode_6 <- xgboost(data = dtrain, 
+                  verbose = 1, 
+                  nrounds = 600, 
+                  eta = 0.45, 
+                  max_depth = 4)
+
+predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
+
+
+dif_abs_model_6_2 <- mean(abs(exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)))
+dif_porc_model_6_2 <- mean(abs((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num))/exp(benchmark_validate$Log_QUA_Desc_Num)))
+eam_model_6_2 <- sqrt(mean((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)) ^ 2))
+
+dif_abs_model_6_2
+dif_porc_model_6_2
+eam_model_6_2
+
+
+# Tercera iteración
+# Using Expand.grid
+train_grid <- expand.grid(max_depth = 5, 
+                          nrounds = c(400, 500, 600),
+                          eta = seq(from = 0.05, to = 1, by = 0.05), 
+                          gamma = 0,
+                          subsample = 1,
+                          min_child_weight = 1,
+                          colsample_bytree = 0.6)
+
+dtrain_y <- benchmark_train$Log_QUA_Desc_Num
+
+train_control <- trainControl(method = "cv",
+                              number = 5,
+                              search = "grid")
+
+#model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
+
+# Tarda mucho pero el mejor modelo es
+# RMSE was used to select the optimal model using the smallest value.
+# The final values used for the model were nrounds = 600, max_depth = 5, eta = 0.25, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+
+
+mode_6 <- xgboost(data = dtrain, 
+                  verbose = 1, 
+                  nrounds = 600, 
+                  eta = 0.25, 
+                  max_depth = 5)
+
+predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
+
+
+dif_abs_model_6_3 <- mean(abs(exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)))
+dif_porc_model_6_3 <- mean(abs((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num))/exp(benchmark_validate$Log_QUA_Desc_Num)))
+eam_model_6_3 <- sqrt(mean((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)) ^ 2))
+
+dif_abs_model_6_3
+dif_porc_model_6_3
+eam_model_6_3
+
+# Cuarta iteración
+# Using Expand.grid
+train_grid <- expand.grid(max_depth = 6, 
+                          nrounds = c(400, 500, 600),
+                          eta = seq(from = 0.05, to = 1, by = 0.05), 
+                          gamma = 0,
+                          subsample = 1,
+                          min_child_weight = 1,
+                          colsample_bytree = 0.6)
+
+dtrain_y <- benchmark_train$Log_QUA_Desc_Num
+
+train_control <- trainControl(method = "cv",
+                              number = 5,
+                              search = "grid")
+
+#model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
+
+# Tarda mucho pero el mejor modelo es
+# RMSE was used to select the optimal model using the smallest value.
+# The final values used for the model were nrounds = 600, max_depth = 6, eta = 0.25, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+
+
+mode_6 <- xgboost(data = dtrain, 
+                  verbose = 1, 
+                  nrounds = 600, 
+                  eta = 0.15, 
+                  max_depth = 6)
+
+predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
+
+
+dif_abs_model_6_4 <- mean(abs(exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)))
+dif_porc_model_6_4 <- mean(abs((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num))/exp(benchmark_validate$Log_QUA_Desc_Num)))
+eam_model_6_4 <- sqrt(mean((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)) ^ 2))
+
+dif_abs_model_6_4
+dif_porc_model_6_4
+eam_model_6_4
+
+```
+
+La siguiente tabla muestra las métricas de validación variando el parámetro $max\_depth$:
+
+| Parámetro $max\_depth$ | EPAM |  EAM |   ECM  |
+|:---------------------:|:----:|:----:|:------:|
+|           1           | 9.23% | \$930 | $1,647 |
+|           2           | 6.76% | \$677 | $1,304 |
+|           3           | 6.26% | \$620 | $1,247 |
+|           4           | 5.65% | \$556 | $1,174 |
+|           5           | 5.69% | \$553 | $1,121 |
+|           6           | 5.74% | \$558 | $1,149 |
+Table: Métricas de Validación por Profundidad del Árbol
+
+
+Se concluye que el mejor parámetro para $max\_depth$ es $4$. Además, de acuerdo al resultado de la función $trainControl$ los hiperparámetros que hacen el mejor ajuste de acuerdo al ECM son: 
+
++ $nrounds=400$ 
+
++ $eta=0.34$
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+mode_6 <- xgboost(data = dtrain, 
+                  verbose = 1, 
+                  nrounds = 600, 
+                  eta = 0.45, 
+                  max_depth = 4)
+
+predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
+
+
+dif_abs_model_6 <- mean(abs(exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)))
+dif_porc_model_6 <- mean(abs((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num))/exp(benchmark_validate$Log_QUA_Desc_Num)))
+eam_model_6 <- sqrt(mean((exp(predict_model_6) - exp(benchmark_validate$Log_QUA_Desc_Num)) ^ 2))
+
+dif_abs_model_6
+dif_porc_model_6
+eam_model_6
+```
+
+Como ya se había mencionado, al estimar el modelo con los parámetros anteriores y calcular las métricas de error en la base de validación se obtiene lo siguiente:
+
+| EPAM   | EAM    | ECM    |
+|:------:|:------:|:------:|
+| 5.7% | \$556 | \$1,174 |
+Table: Métrica de Validación
+
+
+De los resultados obtenidos podemos concluir que la metodología de XGradient Boosting se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 5.7% que representa alrededor de $\$556$. Además, el $ECM$ indica que la desviación promedio es $\$1,174$.
+
+La paquetería de $xgboost$ de R contiene la función $xgb.importance$ que calcula la importancia de las variables.
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.height = 1.5, fig.width = 5, fig.cap = "Importancia de las Variables"}
+
+
+importance_matrix <- xgb.importance(colnames(dtrain), model = mode_6)
+
+importance <- importance_matrix[1:4]
+
+importance$Nombre <- c("Logaritmo Suma asegurada", "Vehículo de Taller", "Estado de México", "Segmento Camión")
+
+#xgb.plot.importance(importance_matrix, 
+#                    rel_to_first = FALSE, 
+#                    xlab = "Importancia", 
+#                    top_n = 4, 
+#                    left_margin = 13) 
+
+ggplot(importance, aes(x = reorder(Nombre , Gain), y = Gain)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  theme_minimal() +
+  ggtitle("Importancia de Variables") +
+  labs(x = "Variable", y = "Ganancia") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold")
+  )
+
+
+```
+
+La variable que tiene más importancia es la Suma Asegurada ("SA_siniestro" en su transformación logarítmica), lo cual tiene sentido ya que se observó que tienen una alta relación. Así mismo, el segmento "Camión" para el segmento del vehículo ("Segmento_R_Camion") y los vehículos que son de "Taller" también son consideradas importantes al ser características del vehículo. Finalmente, la característica geográfica del asegurado en el Estado de México muestran valor predictivo.
+
+Finalmente, procedemos a hacer un análisis sobre los residuos del modelo de XGradient Boosting.
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
+
+plot(exp(predict_model_6), exp(benchmark_validate$Log_QUA_Desc_Num), 
+     xlab = "Valores Estimados (Base Validación)", 
+     ylab = "Valores Reales", xaxt = 'n', yaxt = 'n')
+abline(0,1)
+axis(1, at = pretty(predict_model_6), labels = paste0("$", pretty(predict_model_6)), las = 0.5)
+axis(2, at = pretty(benchmark_validate$Log_QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$Log_QUA_Desc_Num)), las = 0.5) 
+```
+\newpage
+
+Se observa que existe una relación lineal poco dispersa entre los Valores Estimados con los Valores Reales. Las dispersiones moderadas reflejan que hay algunos errores, pero no parecen sistemáticos o extremadamente graves.
+
+
+## 5.7 Validación de los Modelos
+
+
+Como se comentó en capítulos anteriores se hará una comparación de las métricas entre los modelos para poder obtener aquel que tenga mejor predicción. La siguiente tabla muestra las métricas de los modelos en el 20% de datos reservado para la validación.
+
+|           Modelo           |  EPAM  |   EAM  |   ECM  |
+|:--------------------------:|:------:|:------:|:------:|
+|      Regresión Lineal      | 11.80% | \$1,136 | \$1,764 |
+| Modelo Lineal Generalizado | 12% | \$1,137 | \$1,757 |
+|     XGradient Boosting     |  5.7% |  \$556 | \$1,174 |
+Table: Comparativa Entre Modelos
+
+De los resultados, se observa que el modelo con el poder predictivo más alto es la técnica de Machine Learning de XGradient Boosting.
+
+Adicionalmente, siguiendo la propuesta de validación del Capítulo 4 se hace la comapración visual para cada una de las variables más importantes.
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Validación con la Variable de Suma Asegurada", fig.height = 4, fig.width = 6}
+# Por Variable
+benchmark_validate[,':='(model_1 = predict_model_1,
+                         model_1_log = predict_model_1_log,
+                         model_2 = predict_model_2,
+                         model_2_log = predict_model_2_log,
+                         model_6 = predict_model_6)]
+
+benchmark_validate[,':='(SA_Intervalo_5 = cut(SA_siniestro, breaks = 5),
+                         SA_Intervalo_10 = cut(SA_siniestro, breaks = 10),
+                         SA_Intervalo_20 = cut(SA_siniestro, breaks = 20),
+                         SA_Intervalo_30 = cut(SA_siniestro, breaks = 30, dig.lab = 10),
+                         SA_Intervalo_200 = cut(SA_siniestro, breaks = 200))]
+
+df <- benchmark_validate[, .(cotizacion_prom = mean(QUA_Desc_Num),
+                             cotizacion_prom_model_1 = mean(model_1),
+                             cotizacion_prom_model_1_log = mean(exp(model_1_log)),
+                             cotizacion_prom_model_2 = mean(model_2),
+                             cotizacion_prom_model_2_log = mean(exp(model_2_log)),
+                             cotizacion_prom_model_6 = mean(exp(model_6)),
+                             total_datos = .N),by = .(SA_Intervalo_30)]
+
+label <- as.factor(c("$314-$363",	"$218-$266",	"$266-$314", "$121-$169",	"$508-$557",	
+                            "$169-$218",	"$72-$121",	"$22-$72",	"$363-$411",	"$460-$508",	
+                            "$411-$460",	"$557-$605",	"$750-$799",	"$654-$702",	"$1,138-$1,187",	
+                            "$605-$654",	"$896-$944",	"$702-$750",	"$847-$896",	"$1,090-$1,138",	
+                            "$1,187-$1,235",	"$992-$1,041",	"$944-$993",	"$799-$847",	"$1,235-$1,283",	
+                            "$1,429-$1,478",	"$1,283-$1,331"))
+
+
+fig <- ggplot(df) + 
+  geom_col(aes(x = as.factor(SA_Intervalo_30), y = total_datos * 1)) + 
+  geom_line(aes(x = as.factor(SA_Intervalo_30), y = cotizacion_prom / 100, colour="Precio Real"), group = 2) +
+  geom_line(aes(x = as.factor(SA_Intervalo_30), y = cotizacion_prom_model_1_log / 100, colour="Modelo Log-Lineal"), group = 2) +
+  geom_line(aes(x = as.factor(SA_Intervalo_30), y = cotizacion_prom_model_2_log / 100, colour="MLG Log-Lineal"), group = 2) +
+  geom_line(aes(x = as.factor(SA_Intervalo_30), y = cotizacion_prom_model_6 / 100, colour="XGBoost"), group = 2) +
+  scale_color_manual(name = "", values = c("Precio Real" = "black",
+                                           "Modelo Log-Lineal" = "blue",
+                                           "MLG Log-Lineal" = "red",
+                                           "XGBoost" = "green")) +
+  theme_classic() + 
+  scale_x_discrete(guide = guide_axis(angle = 90), labels = label) +
+  xlab("Segmentos de Suma Asegurada (en miles)") +
+  ylab("Número de Cotizaciones")
+fig
+
+```
+
+Para la Suma Asegurada con 30 intervalos se obseva como todos los modelos tienen un ajuste adecuado para los primeros intervalos. Sin embargo, para los valores más altos como el intervalo \$1,187-\$1,235 de Suma Asegurada donde no hay muchos datos se observa que la predicción usando la técnica de Machine Learning es más precisa que las metodologías tradicionales. Sin embargo, en la penúltima categoría de Suma Aseguradas más altas donde el Modelo Lineal fué más preciso de manera más significativa pero sólo se debe al bajo número de cotizaciones. Observando la Suma aSegurada se observa que en general todos los modelos tuvieron un valor predictivo similar.
+
+
+```{r, echo=FALSE, message = FALSE, fig.cap = "Variable Municipio (mayor a 50 cotizaciones)", fig.height = 4, fig.width = 6}
+
+df <- benchmark_validate[, .(cotizacion_prom = mean(QUA_Desc_Num),
+                             cotizacion_prom_model_1 = mean(model_1),
+                             cotizacion_prom_model_1_log = mean(exp(model_1_log)),
+                             cotizacion_prom_model_2 = mean(model_2),
+                             cotizacion_prom_model_2_log = mean(exp(model_2_log)),
+                             cotizacion_prom_model_6 = mean(exp(model_6)),
+                             total_datos = .N),by = .(Municipio_D)][total_datos >= 50]
+fig <- ggplot(df) + 
+  geom_col(aes(x = as.factor(Municipio_D), y = total_datos * 1)) + 
+  geom_line(aes(x = as.factor(Municipio_D), y = cotizacion_prom / 100, colour="Precio Real"), group = 2) +
+  geom_line(aes(x = as.factor(Municipio_D), y = cotizacion_prom_model_1_log / 100, colour="Modelo Log-Lineal"), group = 2) +
+  geom_line(aes(x = as.factor(Municipio_D), y = cotizacion_prom_model_2_log / 100, colour="MLG Log-Lineal"), group = 2) +
+  geom_line(aes(x = as.factor(Municipio_D), y = cotizacion_prom_model_6 / 100, colour="XGBoost"), group = 2) +
+  scale_color_manual(name = "", values = c("Precio Real" = "black",
+                                           "Modelo Log-Lineal" = "blue",
+                                           "MLG Log-Lineal" = "red",
+                                           "XGBoost" = "green")) +
+  theme_classic() + 
+  scale_x_discrete(guide = guide_axis(angle = 90)) +
+  xlab("Municipio") +
+  ylab("Número de Cotizaciones")
+
+fig
+```
+
+
+Para esta variable, se realizó un análisis gráfico considerando únicamente los municipios con más de 50 cotizaciones, lo que permite una mejor visualización de los resultados. No obstante, más adelante se presenta un análisis de métricas que incluye al resto de los municipios.
+
+Se observa que el modelo de XGBoost presenta predicciones muy cercanas al Precio Real del Seguro en la mayoría de los municipios. Además, este modelo muestra un mejor ajuste en los llamados "Municipios Especiales", caracterizados por una alta variabilidad. Por ejemplo, en Atizapán de Zaragoza, la predicción de XGBoost supera significativamente a la de los demás modelos, gracias a su capacidad para capturar los efectos asociados a dicha categoría. En el municipio de Tehuacán, XGBoost también logra un mejor ajuste, aunque en otros casos (como San Pedro Tlaquepaque) ninguno de los modelos evaluados ofrece un desempeño satisfactorio. A diferencia del análisis de la Suma Asegurada, donde no se identificó un modelo claramente superior, en este caso se observa que, en términos generales, XGBoost ofrece la predicción más precisa. Además, la técnica de XGradient Boosting tiene una mejor estimación para la mayor parte de las categorías en Municipio podemos determinar que es el mejor modelo ya que ofrece una predicción más precisa a nivel Zona de cotización. 
+
+\newpage
+
+Para aquellos municipios donde hubo menos de 50 cotizaciones (más de 200 Municipios) es difícil crear una comparación visual similar a las anteriores. Por lo que se decidió hacer una comparación de métricas de error para poder evaluar la variable en todas sus categorías.
+
+
+```{r, echo=FALSE, message = FALSE, results = "hide"}
+
+df <- benchmark_validate[, .(cotizacion_prom = mean(QUA_Desc_Num),
+                             cotizacion_prom_model_1 = mean(model_1),
+                             cotizacion_prom_model_1_log = mean(exp(model_1_log)),
+                             cotizacion_prom_model_2 = mean(model_2),
+                             cotizacion_prom_model_2_log = mean(exp(model_2_log)),
+                             cotizacion_prom_model_6 = mean(exp(model_6)),
+                             total_datos = .N),by = .(Municipio_D)][total_datos < 50]
+
+epam_ml <- mean(abs((df$cotizacion_prom_model_1_log - df$cotizacion_prom)/df$cotizacion_prom))
+eam_ml <- mean(abs(df$cotizacion_prom - df$cotizacion_prom_model_1_log))
+ecm_ml <- sqrt(mean((df$cotizacion_prom_model_1_log - df$cotizacion_prom) ^ 2))
+
+epam_mlg <- mean(abs((df$cotizacion_prom_model_2_log - df$cotizacion_prom)/df$cotizacion_prom))
+eam_mlg <- mean(abs(df$cotizacion_prom - df$cotizacion_prom_model_2_log))
+ecm_mlg <- sqrt(mean((df$cotizacion_prom_model_2_log - df$cotizacion_prom) ^ 2))
+
+epam_xgb <- mean(abs((df$cotizacion_prom_model_6 - df$cotizacion_prom)/df$cotizacion_prom))
+eam_xgb <- mean(abs(df$cotizacion_prom - df$cotizacion_prom_model_6))
+ecm_xgb <- sqrt(mean((df$cotizacion_prom_model_6 - df$cotizacion_prom) ^ 2))
+
+epam_ml
+eam_ml
+ecm_ml
+
+epam_mlg
+eam_mlg
+ecm_mlg
+
+epam_xgb
+eam_xgb
+ecm_xgb
+
+ref <- unique(df$Municipio_D)
+#nrow(ref)
+nrow(benchmark_validate)
+nrow(benchmark_validate[Municipio_D %in% ref])
+
+```
+
+
+|           Modelo           |  EPAM  |   EAM  |   ECM  |
+|:--------------------------:|:------:|:------:|:------:|
+|      Regresión Lineal      | 14.25% | \$1,288 | \$1,909 |
+| Modelo Lineal Generalizado | 14.76% | \$1,296 | \$1,892 |
+|     XGradient Boosting     | 9.4% | \$827 | \$1,352 |
+Table: Comparativa Entre Modelos por Municipio
+
+
+De acuerdo a las métricas de arriba el modelo con mejor estimación es el modelo de XGradient Boosting al reducir todas las métricas de error. Por lo tanto se tiene una mejor predicción por parte del modelo de XGradient Boosting.
+
+De la validación gráfica se concluye que a un nivel Municipio el modelo XGradient Boosting representa una mejora significativa respecto a las otras metodologías tradicionales; además, la variable Municipio es una variable que identifica la zona por lo que la mejora observada es importante.  
+
+La siguiente gráfica es la variable sobre la amrca del automóvil.
+
+```{r, echo=FALSE, message = FALSE, fig.cap = "Variable Marca", fig.height = 4, fig.width = 6}
+df <- benchmark_validate[, .(cotizacion_prom = mean(QUA_Desc_Num),
+                             cotizacion_prom_model_1 = mean(model_1),
+                             cotizacion_prom_model_1_log = mean(exp(model_1_log)),
+                             cotizacion_prom_model_2 = mean(model_2),
+                             cotizacion_prom_model_2_log = mean(exp(model_2_log)),
+                             cotizacion_prom_model_6 = mean(exp(model_6)),
+                             total_datos = .N),by = .(Marca_TP)]
+fig <- ggplot(df) + 
+  geom_col(aes(x = as.factor(Marca_TP), y = total_datos * 1)) + 
+  geom_line(aes(x = as.factor(Marca_TP), y = cotizacion_prom / 80, colour="Precio Real"), group = 2) +
+  geom_line(aes(x = as.factor(Marca_TP), y = cotizacion_prom_model_1_log / 80, colour="Modelo Log-Lineal"), group = 2) +
+  geom_line(aes(x = as.factor(Marca_TP), y = cotizacion_prom_model_2_log / 80, colour="MLG Log-Lineal"), group = 2) +
+  geom_line(aes(x = as.factor(Marca_TP), y = cotizacion_prom_model_6 / 80, colour="XGBoost"), group = 2) +
+  scale_color_manual(name = "", values = c("Precio Real" = "black",
+                                           "Modelo Log-Lineal" = "blue",
+                                           "MLG Log-Lineal" = "red",
+                                           "XGBoost" = "green")) +
+  theme_classic() + 
+  scale_x_discrete(guide = guide_axis(angle = 90)) +
+  xlab("Marca") +
+  ylab("Número de Cotizaciones")
+
+fig
+```
+
+\newpage
+
+Cuando se hace la comparación por Marca se observa que en general todos los modelos siguen el comportamiento del Precio del Seguro. Sin embargo, existen algunas categorías donde el comportamiento de XGradient Boosting es más parecido al Precio Real que el resto de modelos, por ejemplo para la marca ACURA, Porsche, Seat y HINO MOTORS se observa una mejora significativa respecto al resto de modelos. Sin embargo, para la categoría de LAND ROVER el modelo con mayor error es XGradient Boosting, pero su error no es muy diferente comparado al resto de modelos. De la gráfica se concluye que el modelo con mejor predicción es XGradient Boosting. Sin embargo, para esta variable todos los modelos tienen una predicción cercana al valor real.
+
+Aunque esta comparación visual no es definitiva, se observa que el modelo de XGradient Boosting ofrece mejores resultados a un nivel desagregado. 
+
+Como se estableció en el capítulo 4, se hizo otra validación vidual usando la gráficas de cuantiles se hicieron con los datos de validación.
+
+
+```{r, echo=FALSE, message = FALSE, fig.align = "center", fig.cap = "Gráficos de Cuantiles", fig.height = 6, fig.width = 8}
+
+#plot_grid(graph_1, graph_2)
+
+dt <- benchmark_validate[,c("QUA_Desc_Num","model_1_log", "model_2_log","model_6")]
+
+# Modelo Lineal
+# Crear deciles (10 cuantiles) basados en la prima estimada
+dt[, quantile := cut(exp(dt$model_1_log),
+                     breaks = quantile(exp(dt$model_1_log), probs = seq(0, 1, 0.1)),
+                     include.lowest = TRUE, labels = FALSE)]
+
+# Calcular promedio por cuantil
+summary_dt <- dt[, .(
+  promedio_real = mean(QUA_Desc_Num),
+  promedio_estimado = mean(exp(model_1_log))
+), by = quantile]
+
+lift_value_1 <- summary_dt[quantile == 10, promedio_real] - summary_dt[quantile == 1, promedio_real]
+
+# Formato largo para ggplot
+plot_dt <- melt(summary_dt, id.vars = "quantile",
+                variable.name = "tipo", value.name = "Precio_Real")
+
+# Graficar
+graph_1 <- ggplot(plot_dt, aes(x = quantile, 
+                               y = Precio_Real, 
+                               color = tipo)) +
+           geom_line(linewidth = 0.2) +
+           geom_point(size = 0.4) +
+           labs(x = "Decil",
+                y = "Precios Promedio (en miles)",
+                color = "Tipo de Precio"
+                ) +
+  scale_x_continuous(breaks = 1:10) +
+  labs(title = c(paste("Modelo Lineal\nLift ", round(lift_value_1, 0)))) +
+  scale_y_continuous(labels = scales::dollar_format(scale = 0.001)) +
+  scale_color_manual(values = c("promedio_real" = "red", "promedio_estimado" = "blue")) +
+  theme(legend.position = "none", 
+        plot.subtitle = element_text(size = 6),
+        axis.title.y = element_text(size = 8),
+        axis.title.x = element_text(size = 8),
+        plot.title = element_text(size = 8, 
+                                  face = "bold", 
+                                  hjust = 0  # 0 = izquierda, 0.5 = centro, 1 = derecha
+    ))
+
+
+
+# Modelo GLM
+dt <- benchmark_validate[,c("QUA_Desc_Num","model_1_log", "model_2_log","model_6")]
+
+# Crear deciles (10 cuantiles) basados en la prima estimada
+dt[, quantile := cut(exp(dt$model_2_log),
+                     breaks = quantile(exp(dt$model_2_log), probs = seq(0, 1, 0.1)),
+                     include.lowest = TRUE, labels = FALSE)]
+
+# Calcular promedio por cuantil
+summary_dt <- dt[, .(
+  promedio_real = mean(QUA_Desc_Num),
+  promedio_estimado = mean(exp(model_2_log))
+), by = quantile]
+
+lift_value_2 <- summary_dt[quantile == 10, promedio_real] - summary_dt[quantile == 1, promedio_real]
+
+# Formato largo para ggplot
+plot_dt <- melt(summary_dt, id.vars = "quantile",
+                variable.name = "tipo", value.name = "Precio_Real")
+
+# Graficar
+graph_2 <- ggplot(plot_dt, aes(x = quantile, y = Precio_Real, color = tipo)) +
+  geom_line(linewidth = 0.2) +
+  geom_point(size = 0.4) +
+  labs(
+       x = "Decil",
+       y = "Precios Promedio (en miles)",
+       color = "Tipo de Precio") +
+  scale_x_continuous(breaks = 1:10) +
+  scale_y_continuous(labels = scales::dollar_format(scale = 0.001)) +
+  scale_color_manual(values = c("promedio_real" = "red", "promedio_estimado" = "blue"),
+                     labels = c("Precio Real", "Precio Estimado")) +
+  labs(title = c(paste("Modelo Lineal Generalizado\nLift ", round(lift_value_2, 0)))) +
+  theme(legend.position = "none", 
+        axis.title.y = element_text(size = 8), 
+        plot.subtitle = element_text(size = 6),
+        axis.title.x = element_text(size = 8),
+        plot.title = element_text(size = 8, 
+                                  face = "bold", 
+                                  hjust = 0  # 0 = izquierda, 0.5 = centro, 1 = derecha
+    ))
+
+
+
+# Modelo XGradient Boosting
+dt <- benchmark_validate[,c("QUA_Desc_Num","model_1_log", "model_2_log","model_6")]
+
+# Crear deciles (10 cuantiles) basados en la prima estimada
+dt[, quantile := cut(exp(dt$model_6),
+                     breaks = quantile(exp(dt$model_6), probs = seq(0, 1, 0.1)),
+                     include.lowest = TRUE, labels = FALSE)]
+
+# Calcular promedio por cuantil
+summary_dt <- dt[, .(
+  promedio_real = mean(QUA_Desc_Num),
+  promedio_estimado = mean(exp(model_6))
+), by = quantile]
+
+lift_value_3 <- summary_dt[quantile == 10, promedio_real] - summary_dt[quantile == 1, promedio_real]
+
+# Formato largo para ggplot
+plot_dt <- melt(summary_dt, id.vars = "quantile",
+                variable.name = "tipo", value.name = "Precio_Real")
+
+
+
+
+# Graficar
+
+graph_3 <- ggplot(plot_dt, aes(x = quantile, y = Precio_Real, color = tipo)) +
+  geom_line(linewidth = 0.2) +
+  geom_point(size = 0.4) +
+  labs(
+       x = "Decil",
+       y = "Precios Promedio (en miles)",
+       color = "Tipo de Precio") +
+  scale_x_continuous(breaks = 1:10) +
+  scale_y_continuous(labels = scales::dollar_format(scale = 0.001)) +
+  scale_color_manual(values = c("promedio_real" = "red", "promedio_estimado" = "blue"),
+                     labels = c("Precio Real", "Precio Estimado")) +
+  labs(title = c(paste("XGradient Boosting\nLift ", round(lift_value_3, 0)))) +
+  theme(axis.title.y = element_text(size = 9),
+        legend.text = element_text(size = 9),
+        legend.title = element_text(size = 9),
+        legend.key.size = unit(0.25, "cm"), 
+        plot.subtitle = element_text(size = 6),
+        axis.title.x = element_text(size = 8),
+        plot.title = element_text(size = 8, 
+                                  face = "bold", 
+                                  hjust = 0  # 0 = izquierda, 0.5 = centro, 1 = derecha
+    ))
+
+
+#plot_grid(title, graph_1, graph_2, graph_3)
+fila_superior <- plot_grid(graph_1, 
+                           graph_2, 
+                           ncol = 2)
+
+
+
+# Fila inferior: gráfica centrada (entre dos espacios vacíos)
+fila_inferior <- plot_grid(
+  graph_3, plot_spacer() + theme_nothing(),
+  ncol = 2,
+  #ncol = 3,
+  rel_widths = c(2, 1) 
+  #rel_widths = c(1, 2, 1)  # C entra al centro, más grande, centrada perfectamente
+)
+
+
+# Juntar ambas filas
+plot_grid(
+  fila_superior,
+  fila_inferior,
+  ncol = 1,
+  rel_heights = c(1, 1)
+)
+
+
+```
+
+De las gráficas de cuantiles anteriores se observa que todos los modelos están cerca al valor real y crecen de la misma forma. Sin embargo, el primer y último decil del Modelo Lineal se separan del valor real, y el sexto decil del gráfico de cuantiles del Modelo Lineal Generalizado existe una separación significativa. Pero, para el modelo de XGradient Boosting no se observa una separación por lo que el este modelo parece predecir de forma más precisa los valores reales. Finalmente, el “lift” del modelo de XGradient Boosting es mayor que el resto de los modelos, es decir la metodología de Machine Learning identifica mejor los valores más grandes y mínimos del precio real, por lo que el modelo con mejores características predictivas es el modelo de XGradient Boosting.
+
+A partir de los resultados de las métricas de validación, la comparación visual por categoría y los gráficos de cuantiles, se concluye que el modelo con mejor desempeño predictivo es XGBoost. Este resultado se atribuye principalmente a la alta número de variables explicativas categóricas en los datos.
+
+\newpage
+
+# 6. Conclusión
+
+Las metodologías estadísticas como la Regresión Lineal y la Regresión Lineal Generalizada han sido ampliamente utilizadas en el sector asegurador debido a su interpretabilidad, facilidad de implementación y una amplia base bibliográfica. Sin embargo, en la última década, los modelos de Machine Learning han ganado relevancia en la industria de los seguros, integrándose cada vez más en las herramientas empleadas por los Actuarios. Aunque estas metodologías ya eran conocidas, su adopción y expansión han sido posibles gracias al aumento del poder computacional en los últimos años. Además, los modelos de Machine Learning han demostrado mejoras significativas en términos de capacidad predictiva, superando en muchos casos a los métodos tradicionales. Además, presentan la ventaja de no requerir supuestos estrictos sobre la distribución de los datos. No obstante, estos beneficios no siempre son aplicables en todos los contextos: en ciertas situaciones, la interpretabilidad de los parámetros sigue siendo un aspecto prioritario. Por ejemplo, algunos reguladores o empresas optan por seguir utilizando metodologías tradicionales, al no estar dispuestos a asumir el riesgo operativo o de modelo asociado a enfoques más recientes. Si bien existen herramientas como los Partial Dependence Plots (PDP) que permiten interpretar modelos como XGBoost, estas interpretaciones no suelen ser tan directas ni tan claras como las que ofrecen los métodos estadísticos clásicos.
+
+El modelo de XGradient Boosting al ser una optimización de los modelos de Gradient Boosting Machine demuestra en este trabajo ser un ejemplo donde el modelo de Machine Learning es una mejora significativa respecto al resto de modelos ya que no es importante entender los parámetros del modelo (sólo nos interesa poder predecir el precio), el error se reduce de manera significativa, y el tiempo para encontrar los parámetros no es grande. Aunque se pudieron usar otras metodologías que pudieron aprovechar las características geográficas del asegurado (como Modelos Lineales Mixtos) ésta metodología demostró obtener buenos resultados. Adicionalmente, algunas variables económicas o sociales como el Grado de Pobreza o Grado de Delincuencia se pudieron agregar para poder tener una mejor representación del riesgo de la ubicación. Sin embargo, a pesar de las limitaciones mencionadas en las variables el modelo de XGradient Boosting fué la mejor alternativa; por lo tanto, se puede concluir que existen problemas en la industria de los seguros donde sin hacer análisis complejos en las variables que puedan derivar en aumento de supuestos, o sin considerar factores exógenos al asegurado podemos obtener un alto nivel de precisión en la predicción gracias a las técnicas de Machine Learning.
+
+Finalmente, el trabajo también demuestra que el modelo de XGradient Boosting puede mejorar la predicción en los precios de seguros de automóvil con cobertura amplia de la competencia cuando solamente se tengan éstos datos y sin mayor información por parte de la competencia sobre su estimación. Con estas predicciones se puede agregar al cálculo del precio justo para incluir el comportamiento del mercado. Las metodologías de Machine Learning son una oportunidad para obtener mejores resultados en el área de Seguros si los ocupamos en problemas donde la predictibilidad es más importante que la interpretación, y donde no sea costosa la implementación. 
+
+\newpage
+
+# Bibliografía
+
++ Piet de Jong y Gillian Z. (2008). Generalized Linear Models for Insurance Data. (2° ed.). Cambridge University Press.
+
++ Tianqi Chen y Carlos Guestrin (2016).XGBoost: A Scalable Tree Boosting System. University of Washington.
+
++ Gareth James, Daniela Witten, Trevor Hastie y Robert Tibshirani. (2013). An Introduction to Statistical Learning with Applications in R (2° ed.). Springer.
+
++ Asociación Mexicana de Instituciones de Seguros. (2021). Sistema Estadístico del Sector Asegurador del ramo Automóviles.
+
++ Ley de Caminos, Puentes y Autotransporte Federal. (2023). Cámara de Diputados del H. Congreso de la Unión.
+
++ Gobierno de México. (2021). La CONDUSEF te da las cuentas claras del sector asegurador, para el seguro de auto al segundo trimestre de 2021. Condusef. https://www.condusef.gob.mx/?p=contenido&idc=1791&idcat=1 
+
++ Mark Goldburd, Anand Khare, Dan Tevet, Dmitriy Guller. (2020). Generalized Linear Models for Insurance Rating (2° ed.).
+
++ Amazon Web Services Inc. (2024). How XGBoost works - amazon sagemaker. https://docs.aws.amazon.com/sagemaker/latest/dg/xgboost-HowItWorks.html 
+
++ Neter, J., Wasserman, W., & Kutner, M. H. (1983). Applied Linear Regression Models. R.D. Irwin. 
+
++ Chen T, He T, Benesty M, Khotilovich V, Tang Y, Cho H, Chen K, Mitchell R, Cano I, Zhou T, Li M, Xie J, Lin M, Geng Y, Li Y, Yuan J (2024). _xgboost: Extreme Gradient Boosting_. R package version 1.7.7.1,
+  <https://CRAN.R-project.org/package=xgboost>.
+
++ Venables, W. N. & Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition. Springer, New York. ISBN 0-387-95457-0
+
++ H. Wickham. ggplot2: Elegant Graphics for Data Analysis. Springer-Verlag New York, 2016.
+
++ Barrett T, Dowle M, Srinivasan A, Gorecki J, Chirico M, Hocking T (2024). _data.table: Extension of `data.frame`_. R package version 1.15.4, <https://CRAN.R-project.org/package=data.table>.
+
++ Therneau T, Atkinson B (2023). _rpart: Recursive Partitioning and Regression Trees_. R package version 4.1.23, <https://CRAN.R-project.org/package=rpart>.
+
++ Kaplan J (2023). _fastDummies: Fast Creation of Dummy (Binary) Columns and Rows from Categorical Variables_. R
+  package version 1.7.3, <https://CRAN.R-project.org/package=fastDummies>.
+  
++ Wilke C (2024). _cowplot: Streamlined Plot Theme and Plot Annotations for 'ggplot2'_. R package version 1.1.3, <https://CRAN.R-project.org/package=cowplot>.
+
++ R Core Team (2024). _R: A Language and Environment for Statistical Computing_. R Foundation for Statistical Computing, Vienna, Austria. <https://www.R-project.org/>.
+
