@@ -108,11 +108,11 @@ benchmark_model <- benchmark_model[Estado %!in% c("Baja California Sur", "Campec
 
 # 1. Introducción
 
-El objetivo de este trabajo es comparar el desempeño predictivo de modelos tradicionales, como la Regresión Lineal y la regresión Lineal Generalizada, frente a una metodología de *Machine Learning*, en particular el modelo de Gradient Boosting Machine (GBM). Se seleccionó un problema del sector de seguros de daños ya que muchas de las variables que se manejan en este campo (como la suma asegurada, el tipo de vehículo, la antiguedad del vehículo etc.) son variables principalmente categóricas o que no tienen un comportamiento tradicional que hacen necesario el uso de modelos más allá del Modelo Lineal clásico, o los pertenecientes a la familia exponencial como los Modelos Lineales Generalizados. Esto motiva la exploración de enfoques más flexibles como GBM, que pueden capturar relaciones no lineales y complejas entre las variables.
+El objetivo de este trabajo es comparar el desempeño predictivo de modelos tradicionales, como la Regresión Lineal y la regresión Lineal Generalizada, frente a una metodología de *Machine Learning*, en particular el modelo de *Gradient Boosting Machine* (GBM). Se seleccionó un problema del sector de seguros de daños ya que muchas de las variables que se manejan en este campo (como la suma asegurada, el tipo de vehículo, la antiguedad del vehículo etc.) son variables principalmente categóricas o que no tienen un comportamiento tradicional que hacen necesario el uso de modelos más allá del Modelo Lineal clásico, o los pertenecientes a la familia exponencial como los Modelos Lineales Generalizados. Esto motiva la exploración de enfoques más flexibles como GBM, que pueden capturar relaciones no lineales y complejas entre las variables.
 
 El problema seleccionado consiste en predecir el precio del seguro de automóvil con cobertura amplia para una compañía aseguradora, utilizando como base las características del vehículo y la información del propietario. Este tipo de estimación es de gran relevancia para las aseguradoras, ya que al comprender cómo otras compañías podrían establecer sus precios permite fijar tarifas más justas y competitivas, lo que puede traducirse en una mejor posición en el mercado.
 
-Además, este trabajo usa el enfoque comúnmente utilizado en Ciencia de Datos para el desarrollo de modelos estadísticos. Donde el proceso inicia con la selección del problema a resolver, seguido del preprocesamiento y ajuste de los datos. Posteriormente, se elige la el modelo adecuado, se valida el modelo y, finalmente, se selecciona aquel que ofrezca el mejor desempeño predictivo.
+Además, este trabajo usa el enfoque comúnmente utilizado en Ciencia de Datos para el desarrollo de modelos estadísticos enfocado en obtener la mejor predicción. El proceso inicia con la selección del problema a resolver, seguido del preprocesamiento y ajuste de los datos. Posteriormente, se elige el modelo adecuado, se valida y, finalmente, se selecciona aquel que ofrezca el mejor desempeño predictivo.
 
 Adicionalmente, se hace una breve introducción teórica a los tres modelos usados en el trabajo:
 
@@ -190,7 +190,7 @@ Esta estimación de coeficientes se conoce como Mínimos Cuadrados Ordinarios (M
 + Homocedasticidad (varianza constante de los errores)
 + Los residuos $\boldsymbol{\varepsilon}$ tienen distribución Normal con media 0, y son independientes de las variables en $X$
 
-Una vez hecha la estimación del modelo se necesita verificar que se cumplen todos los supuestos. Esto se puede hacer en $R$ llamando la función $plot$ sobre el modelo estimado, y calcula 4 gráficos que permiten verificar visualmente si los residuos tienen una distribución Normal, si los residuos tienen varianza constante, si los residuos son independientes de las variables independientes, y la existencia de valores outliers que esten influenciando la estimación. Esto último se hace con el cálculo de la distancia de Cook que es una medida que evalúa la influencia de una observación en un modelo de regresión definida como:
+Una vez hecha la estimación del modelo se necesita verificar que se cumplen todos los supuestos. Esto se puede hacer en $R$ llamando la función $plot$ sobre el modelo estimado, y calcula cuatro gráficos que permiten verificar visualmente si los residuos tienen una distribución Normal, si los residuos tienen varianza constante, si los residuos son independientes de las variables independientes, y la existencia de valores outliers que esten influenciando la estimación. Esto último se hace con el cálculo de la distancia de Cook que es una medida que evalúa la influencia de una observación en un modelo de regresión definida como:
 
 $$
 D_i = D_i = \frac{r_i^2}{p \cdot (1 - h_{ii})} \times h_{ii}
@@ -254,7 +254,7 @@ Similar al Modelo Lineal hacen uso de la distribución Normal para poder crear d
 
 # 3. Modelo de XGradient Boosting
 
-Para poder entender el modelo de XGradient Boosting (por sus siglas en inglés Extreme Gradient Boosting) es necesario dar una breve introducción a los Árboles de Regresión ya que constituyen la base esta metodología.
+Para poder entender el modelo de XGradient Boosting (por sus siglas en inglés Extreme Gradient Boosting) es necesario dar una breve introducción a los Árboles de Regresión ya que constituyen la base de esta metodología.
 
 ## 3.1 Árbol de Regresión
 
@@ -315,7 +315,7 @@ ggplot() +
 
 En la gráfica se aprecia que para construir un Árbol de Regresión se definieron 3 regiones que no están superpuestas. Estas regiones corresponden a los 3 nodos terminales del gráfico del Árbol de Regresión. Y, para obtener la predicción de las Millas por galón de Gasolina que aparece en cada nodo terminal se calcula el promedio de todas las observaciones de cada región.
 
-De manera general cuando se tiene un conjunto de datos $\{X_1,...,X_p\}$ con una variable explicativa $Y$ lo que se necesita para poder estimar un Árbol de REgresión es lo siguiente:
+De manera general cuando se tiene un conjunto de datos $\{X_1,...,X_p\}$ con una variable explicativa $Y$ lo que se necesita para poder estimar un Árbol de Regresión es lo siguiente:
 
 1. Dividir el espacio de variables explicativas (es decir todo el conjunto de valores posibles para $X_1$,...,$X_p$) en $J$ distintas regiones $R_1$,...,$R_j$ que no estén superpuestas y que minimicen alguna función objetivo.
 
