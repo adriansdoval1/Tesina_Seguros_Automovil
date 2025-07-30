@@ -112,7 +112,7 @@ El objetivo de este trabajo es comparar el desempeño predictivo de modelos trad
 
 El problema seleccionado consiste en predecir el precio del seguro de automóvil con cobertura amplia para una compañía aseguradora, utilizando como base las características del vehículo y la información del propietario. Este tipo de estimación es de gran relevancia para las aseguradoras, ya que al comprender cómo otras compañías podrían establecer sus precios permite fijar tarifas más justas y competitivas, lo que puede traducirse en una mejor posición en el mercado.
 
-Además, este trabajo usa el enfoque comúnmente utilizado en Ciencia de Datos para el desarrollo de modelos estadísticos enfocado en obtener la mejor predicción. El proceso inicia con la selección del problema a resolver, seguido del preprocesamiento y ajuste de los datos. Posteriormente, se elige el modelo adecuado, se valida y, finalmente, se selecciona aquel que ofrezca el mejor desempeño predictivo.
+Además, este trabajo usa el enfoque comúnmente utilizado en Ciencia de Datos para el desarrollo de modelos estadísticos enfocado en obtener la predicción más precisa. El proceso inicia con la selección del problema a resolver, seguido del preprocesamiento y ajuste de los datos. Posteriormente, se elige el modelo adecuado, se valida y, finalmente, se selecciona aquel que ofrezca el mejor desempeño predictivo.
 
 Adicionalmente, se hace una breve introducción teórica a los tres modelos usados en el trabajo:
 
@@ -723,7 +723,7 @@ Se observa que ambos modelos capturan en términos generales la tendencia de los
 
 # 4. Propuesta de Validación de los Modelos
 
-Aunque el objetivo principal de este trabajo es identificar el modelo con las mejores capacidades predictivas, también resulta fundamental evaluar su capacidad de inferencia. Esto permite determinar en qué medida el modelo puede generalizar los resultados y, por ende, realizar predicciones confiables. Por esta razón, la propuesta incluye la validación de los supuestos del Modelo Lineal, el análisis de la permanencia de variables, así como la consideración de una transformación logarítmica de las variables. Finalmente, se usan algunas métricas con un análisis visual para determinar si el modelo tiene buena capacidad predictiva. Los siguientes puntos presentan para la validación de los supuestos de los modelos.
+Si bien el objetivo principal de este trabajo es identificar el modelo con el mayor poder predictivo, resulta igualmente fundamental evaluar su capacidad inferencial. Una solidez inferencial de las relaciones subyacentes entre las variables permite no solo validar el modelo como una aproximación coherente de la realidad, sino también mejorar la precisión de las predicciones derivadas del mismo. Esto permite determinar en qué medida el modelo puede generalizar los resultados y, por ende, realizar predicciones confiables. Por esta razón, la propuesta incluye la validación de los supuestos del Modelo Lineal, el análisis de la permanencia de variables, así como la consideración de una transformación logarítmica de las variables. Finalmente, se usan algunas métricas con un análisis visual para determinar si el modelo tiene buena capacidad predictiva. Los siguientes puntos presentan para la validación de los supuestos de los modelos.
 
 Para el Modelo Lineal y el Modelo Lineal Generalizado se hará lo siguiente:
 
@@ -733,7 +733,7 @@ Para el Modelo Lineal y el Modelo Lineal Generalizado se hará lo siguiente:
 
 + Se realizará un análisis de residuos para evaluar la relación entre los valores estimados y los valores reales. Esto permite determinar qué tan bien las predicciones del modelo capturan el comportamiento real de los datos.
 
-+ Se repetirá el procedimiento del punto anterior, pero aplicando una transformación logarítmica a la variable objetivo y a algunas variables explicativas (como la Suma Asegurada). Ya que esta transformación puede mejorar el desempeño del modelo al estabilizar la varianza y reducir la influencia de valores atípicos, lo que potencialmente mejora la capacidad predictiva. Una vez realizada la estimación con la variable objetivo transformada, se compararán los modelos utilizando el Coeficiente de Información Bayesiano (CIB), con el fin de evaluar cuál ofrece un mejor ajuste.
++ Se repetirá el procedimiento del punto anterior, pero aplicando una transformación logarítmica a la variable objetivo. Ya que esta transformación puede mejorar el desempeño del modelo al estabilizar la varianza y reducir la influencia de valores atípicos, lo que potencialmente mejora la capacidad predictiva. Una vez realizada la estimación con la variable objetivo transformada, se compararán los modelos utilizando el Coeficiente de Información Bayesiano (CIB), con el fin de evaluar cuál ofrece un mejor ajuste entre ambos modelos.
 
 Los pasos anteriores se harán dentro del capítulo de la estimación de cada modelo. Además, se utilizará la transformación que haya demostrado el mejor desempeño en los análisis anteriores al aplicar el modelo de XGBoost, con el fin de garantizar una comparación más justa y consistente entre metodologías. El modelo de XGBoost también tendrá un análisis de importancia de variables así como se describió en el capítulo 3.2.
 
@@ -1560,6 +1560,9 @@ model_2_train <- glm(QUA_Desc_Num ~ Modelo + Moneda + Segmento_R + Elegible_UBER
 
 summary(model_2_train)
 
+phi_hat <- summary(model_2_train)$dispersion
+cv_hat <- sqrt(phi_hat)
+
 ```
 De la estimación lineal generalizada se obtuvo un Coeficiente de Información de Akaike (AIC) de $234,288$ y se observó que sólo 1 variable no fué significativa:
 
@@ -1596,11 +1599,11 @@ eam_model_2
 Table: Métricas de Validación del Modelo Lineal Generalizado
 
 
-De los resultados obtenidos podemos concluir que el Modelo Lineal Generalizado se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 12.8% que representa alrededor de $\$1,207$. Además, el $ECM$ indica que en promedio el modelo tiene una desviación de $\$1,852$ de los datos reales.
+De los resultados obtenidos podemos concluir que el Modelo Lineal Generalizado se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 12.8% que representa alrededor de $\$1,207$. Además, el $ECM$ indica que en promedio el modelo tiene una desviación de $\$1,852$ de los datos reales. Estos resultados sugieren que, si bien el modelo captura parcialmente la estructura de los datos, aún presenta un margen de error parecido al modelo lineal lo cual que podría limitar su utilidad predictiva.
 
 \newpage
 
-Finalmente procedemos a hacer un análisis sobre los residuos estimados.
+Finalmente procedemos a hacer un análisis sobre los residuos estimados con los valores observados para determinar si el modelo creó una relación lineal.
 
 ```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
 plot(predict_model_2, benchmark_validate$QUA_Desc_Num, 
