@@ -161,6 +161,7 @@ Donde:
 + $\mathbf{X} \in \mathbb{R}^{n \times p}$ es la matríz de variables independientes
 + $\boldsymbol{\beta} \in \mathbb{R}^{p \times 1}$ es el vector de coeficientes
 + $\boldsymbol{\varepsilon} \in \mathbb{R}^{n \times 1}$ es el vector de residuos
++ 
 
 La estimacón de los parámetros, $\beta=(\beta_1,...\beta_n)$, se hace minimizando la suma de residuos cuadrados (SCR) observados.
 
