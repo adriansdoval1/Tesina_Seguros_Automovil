@@ -207,7 +207,7 @@ Esta estimación de coeficientes es por el método de Máxima Verosimilitud. Par
 + Homocedasticidad (varianza constante de los errores)
 + Los residuos $\boldsymbol{\varepsilon}$ tienen distribución Normal con media 0, y son independientes de las variables en $X$. Si lo anterior se cumple, la estimación de coeficientes es equivalente a la estimación de Mínimos Cuadrados Ordinarios (MCO) que consiste en minimizar el Error Cuadrático (EC).
 
-Una vez hecha la estimación del modelo se necesita verificar que se cumplen todos los supuestos. Esto se puede hacer en $R$ llamando la función $plot$ sobre el modelo estimado, y calcula cuatro gráficos que permiten verificar visualmente si los residuos tienen una distribución Normal, si los residuos tienen varianza constante, si los residuos son independientes de las variables independientes, y la existencia de valores outliers que esten influenciando la estimación. Esto último se hace con el cálculo de la distancia de Cook que es una medida que evalúa la influencia de una observación en un modelo de regresión definida como:
+Una vez hecha la estimación del modelo se necesita verificar que se cumplen todos los supuestos. Esto se puede hacer en $R$ llamando la función $plot$ sobre el modelo estimado, y calcula cuatro gráficos que permiten verificar visualmente si los residuos tienen una distribución Normal, si los residuos tienen varianza constante, si los residuos son independientes de las variables, y la existencia de valores outliers que esten influenciando la estimación. Esto último se hace con el cálculo de la distancia de Cook que es una medida que evalúa la influencia de una observación en un modelo de regresión definida como:
 
 $$
 D_i = D_i = \frac{r_i^2}{p \cdot (1 - h_{ii})} \times h_{ii}
@@ -219,7 +219,7 @@ Donde:
 - $h_{ii}$ es el leverage (elemento diagonal de la $(\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T$).
 - $p$ es el número de parámetros del modelo (incluyendo intercepto).
 
-Finalmente, se hacen uso de la distribución $t$ para poder crear diseñar una prueba de hipótesis que permite identificar si una variable independiente es estadísticamente significativa dentro del modelo es decir $H0:\beta_i=0$ para el coeficiente de alguna variable $i$.
+Finalmente, se hace uso de la distribución $t$ para poder crear diseñar una prueba de hipótesis que permite identificar si una variable independiente es estadísticamente significativa dentro del modelo es decir $H_0:\beta_i=0$ para el coeficiente de alguna variable $i$.
 
 
 ## 2.2 Modelo Lineal Generalizado
@@ -245,7 +245,7 @@ $$
 $$
   \mathrm{Var}(Y) = \phi \cdot a''(\theta)
 $$
-La siguiente tabla muestra algunas de las distribuciones que pertenecen a la familia exponencial:
+La siguiente tabla muestra algunas de las variables que pertenecen a la familia exponencial:
 
 
 | Distribución| $\theta$| $a(\theta)$| $\phi$       |
@@ -265,7 +265,7 @@ $$
 
 La función anterior se puede maximizar usando algoritmos iterativos como el método de Newton-Raphson, Fisher Scoring, o la metodología de Mínimos Cuadrados Ponderados Iterados. La función $glm$ de la paquetería $stats$ usa el método de Mínimos Cuadrasod Ponderados Iterados para encontrar los coeficientes.
 
-Similar al Modelo Lineal se hace uso de la distribución asintótica función de Máxima Verosimilitud para poder diseñar una prueba de hipótesis que permite identificar si una variable independiente es estadísticamente significativa dentro del modelo es decir $H0:\beta_i=0$ para el coeficiente de alguna variable $i$. La función $glm$ también calcula esta estadística por variable. 
+Similar al Modelo Lineal se hace uso de la distribución asintótica función de Máxima Verosimilitud para poder diseñar una prueba de hipótesis que permite identificar si una variable independiente es estadísticamente significativa dentro del modelo es decir $H_0:\beta_i=0$ para el coeficiente de alguna variable $i$. La función $glm$ también calcula esta estadística por variable. 
 
 Finalmente, similar al Modelo Lineal se puede hacer un análisis post ajuste llamando en $R$ la función $plot$ sobre el modelo estimado.
 
@@ -384,7 +384,7 @@ El algoritmo para estimar el modelo con un grupo de datos de tamaño $m$, con $n
 > b) Actualizar $\hat{f}$ de la siguiente manera
 
 $$
-\hat{f}(x_1,...x_n) \leftarrow\hat{f}(x_1,...x_n)+\eta*\hat{f}^{(k)}(x_1,...x_n)
+\hat{f}(x_1,...x_n) \leftarrow\hat{f}(x_1,...,x_n)+\eta*\hat{f}^{(k)}(x_1,...x_n)
 $$
 
 >> donde $\eta$ es la tasa de aprendizaje que determina la influencia del árbol en las estimaciones subsecuentes y es un parámetro predefinido.
@@ -550,17 +550,17 @@ $$
 \text{obj}^{(t)} \approx \sum_{j=1}^{T} \left[ \left( \sum_{i \in I_j} g_i \right) w_j + \frac{1}{2} \left( \sum_{i \in I_j} h_i + \lambda \right) w_j^2 \right] + \gamma T
 $$
 
-Done $I_j=\{i|q(x_i)=j\}$ representa el conjunto de índices de las observaciones asignadas al j-ésimo nodo terminal. Así mismo podemos hacer la expresión manera más pequeña si definimos lo siguiente:
+Donde $I_j=\{i|q(x_i)=j\}$ representa el conjunto de índices de las observaciones asignadas al j-ésimo nodo terminal. Así mismo podemos hacer la expresión manera más pequeña si definimos lo siguiente:
 
 $$
 G_j = \sum_{i \in I_j} g_i \quad \text{y} \quad H_j = \sum_{i \in I_j} h_i
 $$
-Así terminamos con la siguiente expresión para la función objetivo del t-ésimo Árbol de Regresión a minimizar.
+Así terminamos con la siguiente expresión para la función objetivo del t-ésimo Árbol de Regresión a minimizar
 
 $$
 \text{obj}^{(t)} = \sum_{j=1}^{T} \left[ G_j w_j + \frac{1}{2} (H_j + \lambda) w_j^2 \right] + \gamma T
 $$
-Sin embargo, también se puede encontrar el $w_j$ que minimiza la función anterior derivando con respecto a $w_j$ e igualandola a 0. Así obtenemos que la función objetivo alcanza el mínimo cuando.
+Sin embargo, también se puede encontrar el $w_j$ que minimiza la función anterior derivando con respecto a $w_j$ e igualandola a 0. Así obtenemos que la función objetivo alcanza el mínimo cuando
 
 $$
 w_j^{*}=-\frac{G_j}{H_j + \lambda}
@@ -573,7 +573,7 @@ $$
 
 La expresión anterior evaluada para una $j$ se llama "Score" que se utiliza para evaluar la calidad de una posible división en la estructura del Árbol de Regresión dentro del modelo XGBoost. Durante el proceso de construcción del árbol en la iteración t, esta métrica permite estimar la reducción esperada del error al considerar una variable explicativa $X_i$ como punto de partición. En otras palabras, el "Score" ayuda a determinar qué división produce la mayor ganancia en términos de ajuste del modelo, guiando así la selección óptima de variables y puntos de corte en cada nodo del árbol.
 
-La paquetería de $xgboost$ tiene la función $xgb.plot.importance$ la cual utiliza el score como base para calcular la ganancia ("Gain") asociada a cada variable explicativa. Esta métrica representa la contribución promedio de cada variable a la reducción del error del modelo a lo largo de todos los árboles. En esencia, el "Gain" mide cuánto mejora el modelo, en términos de su función objetivo, al utilizar una variable determinada como criterio de división en los nodos del árbol.
+La paquetería de $xgboost$ tiene la función $xgb.plot.importance$ la cual utiliza el score como base para calcular la ganancia ("Gain") asociada a cada variable explicativa. Esta métrica representa la contribución promedio de cada variable a la reducción del error del modelo a lo largo de todos los árboles y suma 1. En esencia, el "Gain" mide cuánto mejora el modelo, en términos de su función objetivo, al utilizar una variable determinada como criterio de división en los nodos del árbol.
 
 El cálculo del "Gain" de cada variable $i$ es el siguiente:
 
@@ -645,7 +645,7 @@ ggplot(importancia, aes(x = reorder(Nombre , Gain), y = Gain)) +
 ```
 
 
-En el ejemplo se observa que la variable más importante fué el peso del automóvil ("wt") ya que representa más del 60% del Gain total del modelo. 
+En el ejemplo se observa que la variable más importante fué el peso del automóvil ("wt") ya que representa más del 60% del Gain total del modelo. Además, se puede observar que la suma del Gain de las dos variables es igual a 100%.
 
 Haciendo una comapración de las estimaciones con el modelo obtenido en el Árbol de Regresión del capítulo anterior podemos ver lo siguiente:
 
@@ -777,7 +777,7 @@ $$
 ECM=\sqrt{\frac{1}{n}\sum_{i=1}^{n}(\hat{Y}_i-{Y}_{i})^2}.
 $$  
 
-Además de las métricas se harán unas gráficas con los datos de validación que permiten comaprar los resultados del modelo por variable. Dependiendo del tipo de la variable (categórica o continua) se hace un histograma o un diagrama de barras. Por cada intervalo del histograma o categoría del diagrama se calcula el promedio del valor real y el promedio del valor estimado. Esto nos permite identificar que modelo sigue mejor el precio real por variable, y poder evaluar a un nivel más desagregado los resultados finales. Cada análisis se hizo por las variables más importantes que son el municipio del asegurado, intervalo de suma asegurada y la marca del automóvil. Aunque se usaron más variables para estimar los modelos se decidió enforcarse en esas variables ya que tienen más categorías, y esto ofrece una visualización más clara sobre la precisión de cada modelo.
+Además de las métricas se harán unas gráficas con los datos de validación que permiten comparar los resultados del modelo por variable. Dependiendo del tipo de la variable (categórica o continua) se hace un histograma o un diagrama de barras. Por cada intervalo del histograma o categoría del diagrama se calcula el promedio del valor real y el promedio del valor estimado. Esto nos permite identificar que modelo sigue mejor el precio real por variable, y poder evaluar a un nivel más desagregado los resultados finales. Cada análisis se hizo por las variables más importantes que son el municipio del asegurado, intervalo de suma asegurada y la marca del automóvil. Aunque se usaron más variables para estimar los modelos se decidió enforcarse en esas variables ya que tienen más categorías, y esto ofrece una visualización más clara sobre la precisión de cada modelo.
 
 Finalmente, de acuerdo a Mark Goldburd, FCAS, MAAA et al. se puede hacer una comparación visual y directa entre modelos usando los gráficos de cuantiles que son una representación visual y sencilla de la capacidad predictiva de una modelo. La forma en la que se hace es la siguiente:
 
@@ -785,13 +785,13 @@ Finalmente, de acuerdo a Mark Goldburd, FCAS, MAAA et al. se puede hacer una com
 
 2. Agrupar los datos en cuantiles (usualmente se agrupan en quintiles o deciles).
 
-3. Dentro de cada intervalo calcular el promedio del valor real y el promedio del valor estimado
+3. Dentro de cada intervalo calcular el promedio del valor real y el promedio del valor estimado.
 
 Para poder determinar el modelo que ofrezca un mejor valor predictivo se deben considerar 3 cosas
 
-+ La cercanía del valor del modelo al valor real
++ La cercanía del valor del modelo al valor real.
 
-+ El valor del modelo debe aumentar de forma monótona al aumentar el cuantil, así como el valor real
++ El valor del modelo debe aumentar de forma monótona al aumentar el cuantil, así como el valor real.
 
 + Una diferencia grande (también llamada “lift”) entre el promedio del valor real en el cuantil más bajo y el más alto. Ya que esto indica que el modelo es capaz de distinguir entre los valores reales más altos y bajos.
 
@@ -1010,7 +1010,7 @@ Por esta razón, la variable Elegibilidad_UBER se incluirá en los modelos predi
 
 ### 5.4.5 Vehículo de Agencia o de Taller
 
-Esta variable se identifica en la base como "Agencia_Taller", indica si el automóvil cotizado proviene de un taller o de una agencia. Del total de 17,053 registros, el 17% corresponde a vehículos de agencia (2,729 observaciones), lo que sugiere que la variable se encuentra adecfuadamente distribuida entre sus categorías.
+Esta variable se identifica en la base como "Agencia_Taller", indica si el automóvil cotizado proviene de un taller o de una agencia. Del total de 17,053 registros, el 17% corresponde a vehículos de agencia (2,729 observaciones), lo que sugiere que la variable se encuentra adecuadamente distribuida entre sus categorías.
 
 Los automóviles adquiridos en taller son autos más antiguos, que se han reparado o que tienen desgaste, por lo que el costo de asegurarlo es menor. Por lo que se puede decir que esta variable es adecuada para poder predecir el comportamiento del precio del seguro y se decidió usar la variable.
 
@@ -1334,8 +1334,8 @@ Los municipios de arriba tienen una mayor volatilidad con respecto al resto por 
 
 Para la elaboración de los modelos se dividieron los datos en 2 partes:
 
-+ El 80% de los datos se usarán para entrenar el modelo
-+ El 20% de los datos restantes para validarlo
++ El 80% de los datos se usarán para entrenar el modelo.
++ El 20% de los datos restantes para validarlo.
 
 Para la validación se usarán los parámetros obtenidos durante el entrenamiento del modelo y se usarán los datos de validación para estimar la diferencia entre el precio del seguro estimado contra el precio del seguro real. Esta comparación es importante ya que nos permite obtener un grado de error del modelo cuando se usa con datos los cuales no fueron usados para estimar el parámetro, y así obtener una medida adecuada de su utilidad.
 
@@ -1352,6 +1352,8 @@ El siguiente capítulo describirá la forma de evaluar las metodología así com
 Como se ha mencionado anteriormente, en este capítulo se hará la estimación de los modelos. Se comenzará con las metodologías más usuales y más usadas que son los Modelos Lineales y Modelos Lineales Generalizados (usando regresión Gamma). Después de esas estimaciones se preparará la técnica de XGradient Boosting.
 
 Aunque las métricas comparativas entre cada modelo se describieron en el capítulo anterior se decidió hacer análisis adicionales en cada modelo. Por ejemplo, para el modelo lineal se hará el análisis de sus supuestos. Esto se hace con la finalidad de tener el mejor modelo para comparar.
+
+Finalmente, todos los modelos se estimaron con las mismas variables apra poder tener una mejor comparación predictiva.
 
 
 ### 5.6.1 Modelo Lineal
@@ -1477,7 +1479,7 @@ Al estimar el modelo con transformación logarítmica se obtuvo una $R^2-ajustad
 Table: Análisis de Permanencia de Variables
 
 
-Comparado con el modelo sin transformación logarítmica podemos concluir que existe una mejora en la estimación ya que tenemos una métrica $R^2-ajsutada$ mayor y sólo tres variables no son significativas.
+Comparado con el modelo sin transformación logarítmica podemos concluir que existe una mejora en la estimación ya que tenemos una métrica $R^2-ajustada$ mayor y sólo tres variables no son significativas.
 
 Analizando el modelo de la regresión con transformación logarítmica obtenemos lo siguiente.
 
@@ -1497,7 +1499,7 @@ Como se observa en la gráficas anteriores se observa que:
 
 Dado el comportamiento de la gráfica, no se hacen pruebas de hipótesis para verificar las conclusiones.
 
-Volveremos a calcular las métricas de error se obtiene lo siguiente.
+Volviendo a calcular las métricas de error se obtiene lo siguiente.
 
 ```{r, echo=FALSE, message = FALSE, results = "hide"}
 predict_model_1_log <- predict(model_1_train_log, benchmark_validate[,c("Modelo", "Moneda", "Segmento_R", 
@@ -1633,7 +1635,7 @@ axis(1, at = pretty(predict_model_2), labels = paste0("$", pretty(predict_model_
 axis(2, at = pretty(benchmark_validate$QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$QUA_Desc_Num)), las = 0.5) 
 ```
 
-Aunque sí existe una relación lineal entre los valores estimados y los reales pero se observa que los resultados para precios grandes sigue muy dispersa.
+Aunque sí existe una relación lineal entre los valores estimados y los reales pero se observa que los resultados para precios grandes sigue muy dispersa. Además, en la gráfica se observan algunos valores estimados superiores a $\$25,000$ y valores reales menores a $\$20,000$ que no tienen una relación lineal con los valores reales es decir que no siguen al modelo.
 
 De manera similar al modelo lineal, se decidió transformar logaritmicamente la variable dependiente y la Suma Asegurada de la variable independiente para poder tener un modelo más estable. Adicionalmente, se removió la variable "Frenos" para que todas las variables sean significativas. Además, se agregó el cuadrado del logaritmo.
 
@@ -1715,10 +1717,10 @@ Aunque el modelo con transformación logarítmica ofrece resultados más estable
 
 ### 5.6.3 Modelo XGradient Boosting
 
-Para el modelo lineal se usó la función $xgboost$ con la paquetería de $xgboost$ de R. Para éste modelo el valor de los hiperparámetros es crucial. Aunque el modelo tiene muchos hiperparámetros (como los que se presentaron en el capítulo 3.2) se decidió enfocarse en los siguientes que se consideran los principales y hay más guía sobre como encontrarlos:
+Para este modelo se usó la función $xgboost$ con la paquetería de $xgboost$ de R. Aunque el modelo tiene muchos hiperparámetros (como los que se presentaron en el capítulo 3.2) se decidió enfocarse en los siguientes que se consideran los principales y hay más guía sobre como encontrarlos:
 
 + $nrounds$, número máximo de iteraciones del algoritmo. Limitado a ser mayor o igual a $1$.
-+ $eta$, la tasa de aprendizaje del modelo que está entre $0$ y $1$. La documentación de la función en $R$ indica que mientras el valor sea más cercano a 0 se tiene un modelo con menos sobre ajuste. Además, entre más bajo sea también se debe aumentar el número de iteraciones. Su valor por defecto es $0.3$.
++ $eta$, la tasa de aprendizaje del modelo que está entre $0$ y $1$. La documentación de la función en $R$ señala que cuanto más cercano a cero sea el valor de este parámetro menor será el riesgo de sobreajuste del modelo (es decir que el modelo este muy ajustado a los datos de estimación que no pueda generar buenas predicciones). No obstante, valores más bajos implican la necesidad de incrementar el número de iteraciones para alcanzar una mejor estimación del modelo. El valor predeterminado es $0.3$.
 + $max\_depth$, es la profundidad de los árboles que generará. Su valor por defecto es $6$.
 
 Para poder ajustar los hiperparámetros se decidió evaluar el modelo usando varios modelos con los cuales se puede identificar el mejor rendimiento.
@@ -2115,7 +2117,7 @@ ggplot(importance, aes(x = reorder(Nombre , Gain), y = Gain)) +
 
 ```
 
-La variable que tiene más importancia es la Suma Asegurada ("SA_siniestro" en su transformación logarítmica), lo cual tiene sentido ya que se observó que tienen una alta relación. Así mismo, el segmento "Camión" para el segmento del vehículo ("Segmento_R_Camion") y los vehículos que son de "Taller" también son consideradas importantes al ser características del vehículo. Finalmente, la característica geográfica del asegurado en el Estado de México muestran valor predictivo.
+La variable que tiene más importancia (más del 50% de Gain de un total de 100%) es la Suma Asegurada ("SA_siniestro" en su transformación logarítmica), lo cual tiene sentido ya que se observó que tienen una alta relación. Así mismo, el segmento "Camión" para el segmento del vehículo ("Segmento_R_Camion") y los vehículos que son de "Taller" también son consideradas importantes al ser características del vehículo. La característica geográfica del asegurado en el Estado de México muestran valor predictivo.  
 
 Finalmente, procedemos a hacer un análisis sobre los residuos del modelo de XGradient Boosting.
 
@@ -2148,7 +2150,7 @@ Table: Comparativa Entre Modelos
 
 De los resultados, se observa que el modelo con el poder predictivo más alto es la técnica de Machine Learning de XGradient Boosting.
 
-Adicionalmente, siguiendo la propuesta de validación del Capítulo 4 se hace la comapración visual para cada una de las variables más importantes.
+Adicionalmente, siguiendo la propuesta de validación del capítulo 4 se hace la comapración visual para cada una de las variables más importantes.
 
 
 ```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Validación con la Variable de Suma Asegurada", fig.height = 4, fig.width = 6}
@@ -2225,6 +2227,8 @@ fig <- ggplot(df) +
   scale_x_discrete(guide = guide_axis(angle = 90)) +
   xlab("Municipio") +
   ylab("Número de Cotizaciones")
+
+# Puerto vallarta tiene Cotización Promedio de 8406.246
 
 fig
 ```
