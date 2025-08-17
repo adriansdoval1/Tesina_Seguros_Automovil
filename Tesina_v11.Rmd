@@ -1389,7 +1389,6 @@ Table: Análisis de Permanencia de Variables
 
 Del resumen del modelo se obtuvo que la categoría "Zona Volatildad Baja", "Auto Uso Múltiple", y "Carroceria-"SEDAN"" no son significativas. Sin embargo, las variables con más de una categoría y que sólo 1 de ellas no fue significativas se conservarán ya que se desea preservar en el modelo el mayor número de características del automóvil o del asegurado. Finalmente, al tener una $R^2-ajustada$ de 77% indica que el modelo explica aproximadamente más de 3 cuartas partes de la varianza (o que el modelo es 77% mejor que el promedio) lo cual es un ajuste adecuado.
 
-\newpage
 
 Procedemos a hacer el análisis de los supuestos de la regresión.
 
@@ -1534,10 +1533,16 @@ plot(exp(predict_model_1_log), benchmark_validate$QUA_Desc_Num,
 abline(0,1)
 axis(1, at = pretty(exp(predict_model_1_log)), labels = paste0("$", pretty(exp(predict_model_1_log))), las = 0.5)
 axis(2, at = pretty(benchmark_validate$QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$QUA_Desc_Num)), las = 0.5) 
-```
-De manera similar al modelo sin transformación existe una relación lineal entre la estimación con los valores reales y los estimados, pero los valores estimados más grandes siguen teniendo mayor variabilidad con el valor real.
 
-El modelo lineal sin transformación es heterocedastico y no hay evidencia significativa de que sus residuos provengan de una distribución Normal con media 0. Sin embargo, el modelo con transformación logarítmica cumple con los mismos supuestos que el modelo sin transformación y tiene una $R^2-ajustada$ superior lo que nos indica que explica más la varianza del precio del seguro de automóvil. Finalmente, al hacer una comparación con las métricas de validación observamos lo siguiente:
+
+cv2 <- sd(exp(predict_model_1_log)) / mean(exp(predict_model_1_log))
+cv1 <- sd(predict_model_1) / mean(predict_model_1)
+cv1
+cv2
+```
+De manera similar al modelo sin transformación existe una relación lineal entre la estimación con los valores reales y los estimados, pero los valores estimados más grandes siguen teniendo mayor variabilidad con el valor real. Además, el coeficiente de variación (desviación estándar dividida por la media de los datos) para los valores estimados es de 36% que no es muy diferente al obtenido con el modelo sin transformación (36%). Por lo tanto, la dispersión de los datos no se redujo significativamente. 
+
+El modelo lineal sin transformación es heterocedastico y no hay evidencia significativa de que sus residuos provengan de una distribución Normal con media 0. Comparado con el modelo con transformación logarítmica cumple con los mismos supuestos que el modelo sin transformación y tiene una $R^2-ajustada$ superior lo que nos indica que explica más la varianza del precio del seguro de automóvil. Finalmente, al hacer una comparación con las métricas de validación observamos lo siguiente:
 
 | Modelo                     | EAM    | EPAM     | ECM     |
 |:--------------------------:|:-------:|:-------:|:-------:|
@@ -1567,7 +1572,7 @@ De acuerdo a ésta métrica concluimos que el modelo con mejor ajuste es el que 
 
 ### 5.6.2 Modelo Lineal Generalizado
 
-Para el modelo lineal se usó la función $glm$ de R con una distribución Gamma y la liga identidad. La función Gamma se seleccionó ya que los precios son positivos, tiene un sesgo similar y es una distribución muy usada en el área de los seguros. Como se mencionó en capítulos anteriores se ajustará el Modelo Lineal Generalizado y primero se evaluará si todas las variables fueron significativas.
+Para este modelo se usó la función $glm$ de R con una distribución Gamma y la liga identidad. Además, se decidió usar las mismas variables del modelo anterior. La función Gamma se seleccionó ya que los precios son positivos, tiene un sesgo similar y es una distribución muy usada en el área de los seguros. Como se mencionó en capítulos anteriores se ajustará el Modelo Lineal Generalizado y primero se evaluará si todas las variables fueron significativas.
 
 
 ```{r, echo=FALSE, message = FALSE, results = "hide"}
@@ -1595,6 +1600,22 @@ Table: Análisis de Permanencia de Variables
 
 La variable "Frenos" no es significativa cuando es la categoría "1" (el vehículo tiene frenos tipo ABS).
 
+Procedemos a hacer el análisis post ajuste como se hizo con el Modelo Lineal.
+
+```{r, echo=FALSE, message = FALSE, fig.height=5, fig.width=6, fig.cap = "Análisis de Supuestos del Modelo Lineal"}
+
+# Se divide la tabla
+par(mfrow = c(2, 2))
+plot(model_2_train)
+
+```
+De las gráficas anteriores se observa que:
+
++ Se observa independencia entre los residuos y las variables explicativas, ya que los residuos no aumentan a medida que lo hacen los valores ajustados. 
++ Los residuos del modelo no siguen una distribución Normal; sin embargo, su distribución es bastante simétrica, pero en este modelo el gráfico suele mostrar desviaciones porque los residuos no necesariamente siguen una Normal
++ Sólo se observan tres posibles outliers.
++ No se observa evidencia de varianza constante, pero es esperado al usar una distribución Gamma que no tiene varianza constance.
+
 Se calcularon las métricas comparativas para evaluar el tipo de ajuste.
 
 
@@ -1620,7 +1641,7 @@ eam_model_2
 Table: Métricas de Validación del Modelo Lineal Generalizado
 
 
-De los resultados obtenidos podemos concluir que el Modelo Lineal Generalizado se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 12.8% que representa alrededor de $\$1,207$. Además, el $ECM$ indica que en promedio el modelo tiene una desviación de $\$1,852$ de los datos reales. Estos resultados sugieren que, si bien el modelo captura parcialmente la estructura de los datos, aún presenta un margen de error parecido al modelo lineal lo cual que podría limitar su utilidad predictiva.
+De los resultados obtenidos se concluye que el Modelo Lineal Generalizado presenta una desviación respecto al precio real del seguro de automóvil con cobertura amplia de aproximadamente 12.8%, equivalente a $\$1,207$. Asimismo, el ECM muestra que, en promedio, el modelo se aparta en $\$1,852$ de los valores observados. Esto indican que el modelo logra capturar parcialmente la estructura de los datos, aún mantiene un nivel de error comparable al del modelo lineal, lo que podría limitar su efectividad en tareas de predicción.
 
 \newpage
 
@@ -1662,6 +1683,23 @@ De la estimación anterior se obtuvo un Coeficiente de Información de Akaike (A
 | **Carroceria_R-"OTROS"** | 60% |
 Table: Análisis de Permanencia de Variables
 
+Procedemos a hacer el análisis post ajuste como se hizo con el Modelo Lineal.
+
+```{r, echo=FALSE, message = FALSE, fig.height=5, fig.width=6, fig.cap = "Análisis de Supuestos del Modelo Lineal"}
+
+# Se divide la tabla
+par(mfrow = c(2, 2))
+plot(model_2_train_log)
+
+```
+De las gráficas anteriores se observa que:
+
++ Se observa independencia entre los residuos y las variables explicativas, ya que los residuos no aumentan a medida que lo hacen los valores ajustados. 
++ Se observan desviaciones similares en los residuales que se comentaron en el modelo sin transformación
++ Sólo se observan tres posibles outliers.
++ De la misma forma que el modelo anterior no se observa evidencia de varianza constante.
+
+
 Se calcularon las métricas comparativas para evaluar el tipo de ajuste.
 
 
@@ -1687,6 +1725,7 @@ eam_model_2_log
 | 12% | \$1,137 | \$1,757 |
 Table: Métricas de Validación el Modelo Lineal Generalizado con Transformación Logarítmica
 
+Ambos modelos presentan variables no significativas y, a partir del análisis post-ajuste, no se identifican diferencias relevantes en su comportamiento. En ambos casos, los residuos muestran homocedasticidad con respecto a las variables independientes, y se detecta el mismo número de outliers. Por lo tanto, se puede concluir que desde un punto de vista estadístico el ajuste de ambos modelos es comparable, sin que ninguno demuestre superioridad significativa sobre el otro.
 
 De los resultados obtenidos podemos concluir que el Modelo Lineal Generalizado con transformación logarítmica se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 12% que representa alrededor de $\$1,137$. Además, el $ECM$ indica que en promedio el modelo tiene una desviación de $\$1,757$ de los datos reales. La transformación logarítmica no aumenta de manera significativa el poder predictivo del modelo.
 
@@ -1717,7 +1756,7 @@ Aunque el modelo con transformación logarítmica ofrece resultados más estable
 
 ### 5.6.3 Modelo XGradient Boosting
 
-Para este modelo se usó la función $xgboost$ con la paquetería de $xgboost$ de R. Aunque el modelo tiene muchos hiperparámetros (como los que se presentaron en el capítulo 3.2) se decidió enfocarse en los siguientes que se consideran los principales y hay más guía sobre como encontrarlos:
+Para este modelo se usó la función $xgboost$ con la paquetería de $xgboost$ de R y las mismas variables que los modelos anteriores. Aunque el modelo tiene muchos hiperparámetros (como los que se presentaron en el capítulo 3.2) se decidió enfocarse en los siguientes que se consideran los principales y hay más guía sobre como encontrarlos:
 
 + $nrounds$, número máximo de iteraciones del algoritmo. Limitado a ser mayor o igual a $1$.
 + $eta$, la tasa de aprendizaje del modelo que está entre $0$ y $1$. La documentación de la función en $R$ señala que cuanto más cercano a cero sea el valor de este parámetro menor será el riesgo de sobreajuste del modelo (es decir que el modelo este muy ajustado a los datos de estimación que no pueda generar buenas predicciones). No obstante, valores más bajos implican la necesidad de incrementar el número de iteraciones para alcanzar una mejor estimación del modelo. El valor predeterminado es $0.3$.
@@ -2334,7 +2373,7 @@ Aunque esta comparación visual no es definitiva, se observa que el modelo de XG
 Como se estableció en el capítulo 4, se hizo otra validación vidual usando la gráficas de cuantiles se hicieron con los datos de validación.
 
 
-```{r, echo=FALSE, message = FALSE, fig.align = "center", fig.cap = "Gráficos de Cuantiles", fig.height = 6, fig.width = 8}
+```{r, echo=FALSE, message = FALSE, fig.align = "center", fig.cap = "Gráficos de Cuantiles", fig.height = 6, fig.width = 6.5}
 
 #plot_grid(graph_1, graph_2)
 
