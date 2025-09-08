@@ -1602,7 +1602,7 @@ La variable "Frenos" no es significativa cuando es la categoría "1" (el vehícu
 
 Procedemos a hacer el análisis post ajuste como se hizo con el Modelo Lineal.
 
-```{r, echo=FALSE, message = FALSE, fig.height=5, fig.width=6, fig.cap = "Análisis de Supuestos del Modelo Lineal"}
+```{r, echo=FALSE, message = FALSE, fig.height=5, fig.width=6, fig.cap = "Análisis del Ajuste del Modelo Lineal Generalizado"}
 
 # Se divide la tabla
 par(mfrow = c(2, 2))
@@ -1685,7 +1685,7 @@ Table: Análisis de Permanencia de Variables
 
 Procedemos a hacer el análisis post ajuste como se hizo con el Modelo Lineal.
 
-```{r, echo=FALSE, message = FALSE, fig.height=5, fig.width=6, fig.cap = "Análisis de Supuestos del Modelo Lineal"}
+```{r, echo=FALSE, message = FALSE, fig.height=5, fig.width=6, fig.cap = "Análisis de al Ajuste del Modelo Lineal Generalizado"}
 
 # Se divide la tabla
 par(mfrow = c(2, 2))
