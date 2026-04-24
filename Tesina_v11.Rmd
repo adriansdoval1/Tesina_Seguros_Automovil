@@ -1,7 +1,7 @@
 ---
 title: "Tesina Adrián Sandoval Cordero"
 author: "Adrián Sandoval"
-date: "2025-06-02"
+date: "2026-23-04"
 output: pdf_document
 lang: Es-es
 fig_width: 4 
@@ -108,9 +108,9 @@ benchmark_model <- benchmark_model[Estado %!in% c("Baja California Sur", "Campec
 
 # 1. Introducción
 
-El objetivo de este trabajo es comparar el desempeño predictivo de modelos tradicionales, como la Regresión Lineal y la regresión Lineal Generalizada, frente a una metodología de *Machine Learning*, en particular el modelo de *Gradient Boosting Machine* (GBM). Se seleccionó un problema del sector de seguros de daños ya que muchas de las variables que se manejan en este campo (como la suma asegurada, el tipo de vehículo, la antiguedad del vehículo etc.) son variables principalmente categóricas o que no tienen un comportamiento tradicional que hacen necesario el uso de modelos más allá del Modelo Lineal clásico, o los pertenecientes a la familia exponencial como los Modelos Lineales Generalizados. Esto motiva la exploración de enfoques más flexibles como GBM, que pueden capturar relaciones no lineales y complejas entre las variables.
+El objetivo de este trabajo es comparar el desempeño predictivo de modelos tradicionales, como la Regresión Lineal y la Regresión Lineal Generalizada, frente a una metodología de *Machine Learning*, en particular el modelo de *Gradient Boosting Machine* (GBM). Se seleccionó un problema del sector de seguros de daños ya que muchas de las variables que se manejan en este campo (como la suma asegurada, el tipo de vehículo, la antiguedad del vehículo etc.) son variables principalmente categóricas o que no tienen un comportamiento tradicional que hacen necesario el uso de modelos más allá del Modelo Lineal clásico, o los pertenecientes a la familia exponencial como los Modelos Lineales Generalizados. Esto motiva la exploración de enfoques más flexibles como GBM, que pueden capturar relaciones no lineales y complejas entre las variables.
 
-El problema seleccionado consiste en predecir el precio del seguro de automóvil con cobertura amplia para una compañía aseguradora, utilizando como base las características del vehículo y la información del propietario. Este tipo de estimación es de gran relevancia para las aseguradoras, ya que al comprender cómo otras compañías podrían establecer sus precios permite fijar tarifas más justas y competitivas, lo que puede traducirse en una mejor posición en el mercado.
+El problema seleccionado consiste en predecir el precio del seguro de automóvil con cobertura amplia de una compañía aseguradora, utilizando como base las características del vehículo y la información del propietario. Este tipo de estimación es de gran relevancia para las aseguradoras, ya que al comprender cómo otras compañías podrían establecer sus precios permite fijar tarifas más justas y competitivas, lo que puede traducirse en una mejor posición en el mercado.
 
 Además, este trabajo usa el enfoque comúnmente utilizado en Ciencia de Datos para el desarrollo de modelos estadísticos enfocado en obtener la predicción más precisa. El proceso inicia con la selección del problema a resolver, seguido del preprocesamiento y ajuste de los datos. Posteriormente, se elige el modelo adecuado, se valida y, finalmente, se selecciona aquel que ofrezca el mejor desempeño predictivo.
 
@@ -157,16 +157,16 @@ $$
 $$
 Donde:
 
-+ $\mathbf{Y} \in \mathbb{R}^{n \times 1}$ es el vector de la variable respuesta observado
++ $\mathbf{Y} \in \mathbb{R}^{n \times 1}$ es el vector de la variable objetivo observado
 + $\mathbf{X} \in \mathbb{R}^{n \times p}$ es la matríz de variables independientes y cada $\mathbf{x}$ es una observación de esta
 + $\boldsymbol{\beta} \in \mathbb{R}^{p \times 1}$ es el vector de coeficientes
 + $\boldsymbol{\varepsilon} \in \mathbb{R}^{n \times 1}$ es el vector de residuos
-+ $\boldsymbol{\varepsilon} \sim \mathcal{N}(\mathbf{0}, \sigma^2 \mathbf{I}_n)$ es decir se distribuye como una Normal Multivariada donde $\mathbf{I}_n$ es la matriz identidad de $n$ dimensiones
++ $\boldsymbol{\varepsilon} \sim \mathcal{N}(\mathbf{0}, \sigma^2 \mathbf{I}_n)$ es decir, se distribuye como una Normal Multivariada donde $\mathbf{I}_n$ es la matriz identidad de $n$ dimensiones
 
-La estimacón de los parámetros, $\beta=(\beta_1,...\beta_n)$, se hace mediante de Máxima Verosimilitud.
+La estimación de los parámetros, $\beta=(\beta_1,...\beta_n)$, se hace mediante de Máxima Verosimilitud.
 
 Como cada observación de $X$ es conocida, y como $\boldsymbol{\varepsilon}$ tiene una distribución Normal Multivariada podemos expresar la función de densidad de cada $Y_i$ como una Normal con media 
-$\mathbf{x_i}^\top \boldsymbol{\beta}$ y varianza $\sigma^2$.
+$\mathbf{x_i}^\top \boldsymbol{\beta}$ y varianza $\sigma^2$ de la siguiente manera:.
 
 $$
 f_{Y_i}(y_i \mid \mathbf{x_i}, \boldsymbol{\beta}, \sigma^2) = \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left( -\frac{(y_i - \mathbf{x_i}^\top \boldsymbol{\beta})^2}{2\sigma^2} \right)
@@ -205,21 +205,23 @@ Esta estimación de coeficientes es por el método de Máxima Verosimilitud. Par
 + $(\mathbf{X}^T \mathbf{X})$ es invertible (no existe multicolinealidad perfecta)
 + Independencia entre los errores
 + Homocedasticidad (varianza constante de los errores)
-+ Los residuos $\boldsymbol{\varepsilon}$ tienen distribución Normal con media 0, y son independientes de las variables en $X$. Si lo anterior se cumple, la estimación de coeficientes es equivalente a la estimación de Mínimos Cuadrados Ordinarios (MCO) que consiste en minimizar el Error Cuadrático (EC).
++ Los residuos $\boldsymbol{\varepsilon}$ tienen distribución Normal con media 0, y son independientes de las variables en $X$. 
 
-Una vez hecha la estimación del modelo se necesita verificar que se cumplen todos los supuestos. Esto se puede hacer en $R$ llamando la función $plot$ sobre el modelo estimado, y calcula cuatro gráficos que permiten verificar visualmente si los residuos tienen una distribución Normal, si los residuos tienen varianza constante, si los residuos son independientes de las variables, y la existencia de valores outliers que esten influenciando la estimación. Esto último se hace con el cálculo de la distancia de Cook que es una medida que evalúa la influencia de una observación en un modelo de regresión definida como:
+Si lo anterior se cumple, la estimación de coeficientes es equivalente a la estimación de Mínimos Cuadrados Ordinarios (MCO) que consiste en minimizar el Error Cuadrático (EC).
+
+Una vez hecha la estimación del modelo se necesita verificar que se cumplen todos los supuestos. Esto se puede hacer en $R$ llamando la función $plot$ sobre el modelo estimado, y calcula cuatro gráficos que permiten verificar visualmente si los residuos tienen una distribución Normal, si los residuos tienen varianza constante, si los residuos son independientes de las variables, y la existencia de valores outliers que esten influenciando la estimación. Esto último se hace con el cálculo de la Distancia de Cook que es una medida que evalúa la influencia de una observación en un modelo de regresión definida como:
 
 $$
-D_i = D_i = \frac{r_i^2}{p \cdot (1 - h_{ii})} \times h_{ii}
+ D_i = \frac{r_i^2}{p \cdot (1 - h_{ii})} \times h_{ii}
 $$
 
 Donde:
 
-- $r_i$ es el residuo estandarizado, que son los residuos del modelo divididos por una estimación de su desviación estándar, considerando el leverage de cada observación.
-- $h_{ii}$ es el leverage (elemento diagonal de la $(\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T$).
+- $r_i$ es el residuo estandarizado, que son los residuos del modelo divididos por una estimación de su desviación estándar, considerando el *leverage* de cada observación.
+- $h_{ii}$ es el *leverage* (elemento diagonal de la $(\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T$).
 - $p$ es el número de parámetros del modelo (incluyendo intercepto).
 
-Finalmente, se hace uso de la distribución $t$ para poder crear diseñar una prueba de hipótesis que permite identificar si una variable independiente es estadísticamente significativa dentro del modelo es decir $H_0:\beta_i=0$ para el coeficiente de alguna variable $i$.
+Finalmente, se hace uso de la distribución $t$ para diseñar una prueba de hipótesis que permite identificar si el coeficiente de una variable independiente es estadísticamente significativa dentro del modelo es decir $H_0:\beta_i=0$ para el coeficiente de alguna variable $i$.
 
 
 ## 2.2 Modelo Lineal Generalizado
@@ -256,16 +258,16 @@ La siguiente tabla muestra algunas de las variables que pertenecen a la familia 
 | Gamma|$-\lambda$|$-\ln(-\theta)$| $\frac{1}{v}$|
 Table: Ejemplos de la Familia Exponencial
 
-A diferencia de la regresión lineal, en este caso no existe una fórmula cerrada para estimar los parámetros mediante el método de Mínimos Cuadrados Ordinarios (MCO). Por ello, se recurre a la maximización de la log-verosimilitud para obtener las estimaciones.
+A diferencia de la regresión lineal, en este caso no existe una fórmula cerrada para estimar los parámetros maximizando la función de densidad de Máxima Verosimilitud o de Mínimos Cuadrados Ordinarios (MCO). Por ello, se recurre a la maximización de la log-verosimilitud para obtener las estimaciones.
 
 $$
 \ell(\boldsymbol{\beta}, \phi) = \sum_{i=1}^n\frac{(y_i \theta_i - a(\theta_i))}{\phi}+ c(y_i, \phi)
 $$
 
 
-La función anterior se puede maximizar usando algoritmos iterativos como el método de Newton-Raphson, Fisher Scoring, o la metodología de Mínimos Cuadrados Ponderados Iterados. La función $glm$ de la paquetería $stats$ usa el método de Mínimos Cuadrasod Ponderados Iterados para encontrar los coeficientes.
+La función anterior se puede maximizar usando algoritmos iterativos como el método de Newton-Raphson, Fisher Scoring, o la metodología de Mínimos Cuadrados Ponderados Iterados. La función $glm$ de la paquetería $stats$ usa el método de Mínimos Cuadrados Ponderados Iterados para encontrar los coeficientes.
 
-Similar al Modelo Lineal se hace uso de la distribución asintótica función de Máxima Verosimilitud para poder diseñar una prueba de hipótesis que permite identificar si una variable independiente es estadísticamente significativa dentro del modelo es decir $H_0:\beta_i=0$ para el coeficiente de alguna variable $i$. La función $glm$ también calcula esta estadística por variable. 
+Similar al Modelo Lineal se hace uso de la distribución t pero manera asintótica (es decir una distribución Normal) para poder diseñar una prueba de hipótesis que permite identificar si el coeficiente de una variable independiente es estadísticamente significativa dentro del modelo es decir $H_0:\beta_i=0$ para el coeficiente de alguna variable $i$. La función $glm$ también calcula dicha estadística por variable. 
 
 Finalmente, similar al Modelo Lineal se puede hacer un análisis post ajuste llamando en $R$ la función $plot$ sobre el modelo estimado.
 
@@ -279,7 +281,7 @@ Para poder entender el modelo de XGradient Boosting (por sus siglas en inglés E
 
 Un Árbol de Regresión es un modelo estadístico utilizado para predecir valores numéricos continuos a partir de un conjunto de datos. Cada observación en el conjunto contiene una variable objetivo conocida y un conjunto de variables explicativas. El modelo construye una estructura en forma de árbol que divide los datos de manera secuencial en subconjuntos cada vez más homogéneos. 
 
-La siguiente imagen es una representación de la estructura de un Árbol de Regresión. Éste modelo se estimó usando los datos $mtcars$ de la paquetería $R$ hecha con la librería $rpart$. Estos datos contienen información sobre el rendimiento de 32 autos así como 10 características de estos. La variable objetivo es el rendimiento del vehículo (Millas por Galón de Gasolina), y las variables explciativas son los Caballos de Fuerza y el Peso de Cada vehículo.
+La siguiente imagen es una representación de la estructura de un Árbol de Regresión. Éste modelo se estimó usando los datos $mtcars$ de la paquetería $R$ hecha con la librería $rpart$. Estos datos contienen información sobre el rendimiento de 32 autos así como 10 características de estos. La variable objetivo es el rendimiento del vehículo (Millas por Galón de Gasolina), y las variables explativas son los Caballos de Fuerza y el Peso de Cada vehículo.
 
 ```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Ejemplo de Árbol de Regresión", fig.height = 3, fig.width = 5}
 
@@ -357,11 +359,11 @@ Entonces, tenemos que definir una forma de dividir el espacio de variables expli
 Entonces, primero se selecciona la variable predictora $X_i$ y se selecciona un punto de corte $s$ tal que las regiones $R_1=\{X_i|X_i<s\}$ y $R_2=\{X_i|X_i>=s\}$ minimicen el EC. Después se selecciona otra variable $X_j$ y se hace lo mismo. De esta manera se consideran todas las posibles variables explicativas, diferentes puntos de corte, y aquella estimación que minimice el EC. Aunque puede parecer un buen método existe el riesgo de que el Árbol de Regresión resultante sea demasiado grande y tenga muchos nodos terminales (sea muy complejo) por lo que termine sobreajustado. Es decir, el Árbol de Regresión setá muy adaptado a las particularidades del conjunto de entrenamiento y, por lo tanto, generar predicciones poco confiables en nuevos datos. Para evitar este sobreajuste y, al mismo tiempo, no generar un árbol excesivamente simple (con muy pocos nodos), se incorpora un término de penalización de complejidad a la función objetivo a minimizar.
 
 $$
-\sum_{j=1}^{J} \sum_{i \in R_j}  (y_i - \hat{y}_{R_j})^2 + \alpha|T|
+\sum_{j=1}^{J} \sum_{i \in R_j}  (y_i - \hat{y}_{R_j})^2 + \alpha|J|
 $$
 Donde:
 
-+ $|T|$ es el número de nodos terminales.
++ $|J|$ es el número de nodos terminales (o regiones).
 + $\alpha$ es el parámetro de ajuste.
 
 Mientras $\alpha$ se haga grande, vamos a tener un Árbol de Regresión mucho menos complejo, pero si $\alpha=0$ regresamos al caso anterior es decir al Árbol de Regresión sin restricciones. Por lo que la estimación del Árbol de Regresión se reduce a encontrar las regiones minimicen la función objetivo anterior más un término de penalización de complejidad.
@@ -529,25 +531,25 @@ $$
 Tianqi Chen y Carlos Guestrin (2016) usan la siguiente definición para $\omega(f_t)$:
 
 $$
-\omega(f_t) =  \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_{j}^2 
+\omega(f_t) =  \gamma T^{(t)} + \frac{1}{2} \lambda \sum_{j=1}^{T^{(t)}} w_{j}^2 
 $$
-Donde $w_{q(x)} \in \mathbb{R}^T$ es un vector con los valores estimados en cada nodo terminal del t-ésimo Árbol de Regresión, y $q:\mathbb{R}^n \rightarrow \{1,2,...,T\}$ es una función que asigna cada dato a un nodo terminal donde $T$ es el número de nodos terminales. Por lo tanto, la función $w_{q(x)}$ es un vector con los valores estimados en cada nodo terminal del t-ésimo Árbol de Regresión, y $q$ es una función que asigna cada dato a un nodo terminal de ese árbol.
+Donde $w_{q(x)} \in \mathbb{R}^T$ es un vector con los valores estimados en cada nodo terminal del t-ésimo Árbol de Regresión, y $q:\mathbb{R}^n \rightarrow \{1,2,...,T\}$ es una función que asigna cada dato a un nodo terminal donde $T^{(t)}$ es el número de nodos terminales en el árbol de la iteración $t$. Por lo tanto, la función $w_{q(x)}$ es un vector con los valores estimados en cada nodo terminal del t-ésimo Árbol de Regresión, y $q$ es una función que asigna cada dato a un nodo terminal de ese árbol.
 
 De esta forma podemos tener una función objetivo que se puede minimizar:
 
 $$
-\text{obj}^{(t)} \approx \sum_{i=1}^n \left[ g_i f_t(x_i) + \frac{1}{2} h_i f_t(x_i)^2 \right] + \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_{j}^2  
+\text{obj}^{(t)} \approx \sum_{i=1}^n \left[ g_i f_t(x_i) + \frac{1}{2} h_i f_t(x_i)^2 \right] + \gamma T^{(t)} + \frac{1}{2} \lambda \sum_{j=1}^{T^{(t)}} w_{j}^2  
 $$
 
 Agrupando y usando las definiciones anteriores podemos llegar a la siguiente expresión:
 
 $$
-\text{obj}^{(t)} \approx \sum_{i=1}^{n} \left[ g_i w_{q(x_i)} + \frac{1}{2} h_i w_{q(x_i)}^2 \right] + \gamma T + \frac{1}{2} \lambda \sum_{j=1}^{T} w_j^2 
+\text{obj}^{(t)} \approx \sum_{i=1}^{n} \left[ g_i w_{q(x_i)} + \frac{1}{2} h_i w_{q(x_i)}^2 \right] + \gamma T^{(t)} + \frac{1}{2} \lambda \sum_{j=1}^{T^{(t)}} w_j^2 
 $$
 Dado que cada nodo terminal asigna la misma predicción a todos los datos que contiene, el término anterior puede reescribirse de la siguiente forma:
 
 $$
-\text{obj}^{(t)} \approx \sum_{j=1}^{T} \left[ \left( \sum_{i \in I_j} g_i \right) w_j + \frac{1}{2} \left( \sum_{i \in I_j} h_i + \lambda \right) w_j^2 \right] + \gamma T
+\text{obj}^{(t)} \approx \sum_{j=1}^{T^{(t)}} \left[ \left( \sum_{i \in I_j} g_i \right) w_j + \frac{1}{2} \left( \sum_{i \in I_j} h_i + \lambda \right) w_j^2 \right] + \gamma T^{(t)}
 $$
 
 Donde $I_j=\{i|q(x_i)=j\}$ representa el conjunto de índices de las observaciones asignadas al j-ésimo nodo terminal. Así mismo podemos hacer la expresión manera más pequeña si definimos lo siguiente:
@@ -558,20 +560,20 @@ $$
 Así terminamos con la siguiente expresión para la función objetivo del t-ésimo Árbol de Regresión a minimizar
 
 $$
-\text{obj}^{(t)} = \sum_{j=1}^{T} \left[ G_j w_j + \frac{1}{2} (H_j + \lambda) w_j^2 \right] + \gamma T
+\text{obj}^{(t)} = \sum_{j=1}^{T^{(t)}} \left[ G_j w_j + \frac{1}{2} (H_j + \lambda) w_j^2 \right] + \gamma T^{(t)}
 $$
 Sin embargo, también se puede encontrar el $w_j$ que minimiza la función anterior derivando con respecto a $w_j$ e igualandola a 0. Así obtenemos que la función objetivo alcanza el mínimo cuando
 
 $$
 w_j^{*}=-\frac{G_j}{H_j + \lambda}
 $$
-Y al substituirla en la función objetivo tenemos que el mínimo valor de la función objetivo es:
+Y al substituirla en la función objetivo tenemos que el mínimo valor de la función objetivo en la iteración $t$ es:
 
 $$
 \text{obj}^{(*)}  = -\frac{1}{2}\sum_{j=1}^{T} \frac{G_j^2}{H_j + \lambda} + \gamma T
 $$
 
-La expresión anterior evaluada para una $j$ se llama "Score" que se utiliza para evaluar la calidad de una posible división en la estructura del Árbol de Regresión dentro del modelo XGBoost. Durante el proceso de construcción del árbol en la iteración t, esta métrica permite estimar la reducción esperada del error al considerar una variable explicativa $X_i$ como punto de partición. En otras palabras, el "Score" ayuda a determinar qué división produce la mayor ganancia en términos de ajuste del modelo, guiando así la selección óptima de variables y puntos de corte en cada nodo del árbol.
+La expresión anterior evaluada para una $j$ se llama "Score" que se utiliza para evaluar la calidad de una posible división en la estructura del Árbol de Regresión dentro del modelo XGBoost. Durante el proceso de construcción del árbol en la iteración t, esta métrica permite estimar la reducción esperada del error al considerar una variable explicativa $X_i$ como punto de partición. En otras palabras, el "Score" ayuda a determinar qué división produce la mayor ganancia en términos de ajuste del modelo, guiando así la selección óptima de variables y puntos de corte en cada nodo del árbol. Para tener un ajuste más simple se dejó a $\gamma=0$ que es valor predeterminado en la paquetería.
 
 La paquetería de $xgboost$ tiene la función $xgb.plot.importance$ la cual utiliza el score como base para calcular la ganancia ("Gain") asociada a cada variable explicativa. Esta métrica representa la contribución promedio de cada variable a la reducción del error del modelo a lo largo de todos los árboles y suma 1. En esencia, el "Gain" mide cuánto mejora el modelo, en términos de su función objetivo, al utilizar una variable determinada como criterio de división en los nodos del árbol.
 
@@ -746,7 +748,7 @@ Si bien el objetivo principal de este trabajo es identificar el modelo con el ma
 
 Para el Modelo Lineal y el Modelo Lineal Generalizado se hará lo siguiente:
 
-+ Se evaluará la permamencia de variables explicativas utilizando como criterio el $p-value$. Adicionalmente, se evaluará si la estimación es adecuada de acuerdo a la métrica de $R^2-ajustada$ y en el caso del Modelo Lineal se hará un análisis visual de los supuestos usando la función $plot$ de la paquetería base de $R$ la cual genera diferentes gráficas diagnósticas que permiten evaluar si los supuestos del modelo se cumplen adecuadamente. 
++ Se evaluará la permanencia de variables explicativas utilizando como criterio el $p-value$. Adicionalmente, se evaluará si la estimación es adecuada de acuerdo a la métrica de $R^2-ajustada$ y en el caso del Modelo Lineal se hará un análisis visual de los supuestos usando la función $plot$ de la paquetería base de $R$ la cual genera diferentes gráficas diagnósticas que permiten evaluar si los supuestos del modelo se cumplen adecuadamente. 
 
 + Además, la función $plot$ permite visualizar la distancia de Cook, una medida útil para identificar observaciones influyentes o posibles outliers en el modelo.
 
@@ -797,7 +799,7 @@ Para poder determinar el modelo que ofrezca un mejor valor predictivo se deben c
 
 Para cada modelo se elaborará un gráfico de cuantiles con los datos de validación y se calculará su “lift” con el objetivo de identificar aquel con el mejor desempeño predictivo.
 
-El mejor modelos en capacidades predictivas será aquel que tengas las métricas de error más bajas, y cuyos análisis visuales represente el mejor ajuste.
+El mejor modelo en capacidades predictivas será aquel que tengas las métricas de error más bajas, y cuyos análisis visuales represente el mejor ajuste.
 
 \newpage
 
@@ -828,7 +830,7 @@ benchmark_model <- benchmark_model[QUA_Desc_Num <= 30000]
 nrow(benchmark_model)
 ```
 
-Los datos utilizados son desagrupados y comprenden un total de $16,942$ cotizaciones de seguros de auto con cobertura amplia. Estas cotizaciones abarcan diversos tipos de vehículos, incluyendo Sedán, SUV y camiones ligeros, ubicados en distintos estados del país. Los datos representan una muestra del tipo de vehículos comúnmente encontrados en la República Mexicana y las cotizaciones fueron realizadas por una compañía aseguradora en el año 2021, por lo que no reflejan los precios actuales del mercado. Finalmente, solo se consideraron cotizaciones menores a $30,000 pesos.
+Los datos utilizados son desagrupados y comprenden un total de $16,942$ cotizaciones de seguros de auto con cobertura amplia. Estas cotizaciones abarcan diversos tipos de vehículos, incluyendo Sedán, SUV y camiones ligeros, ubicados en distintos estados del país. Los datos representan una muestra del tipo de vehículos comúnmente encontrados en la República Mexicana y las cotizaciones fueron realizadas a compañía aseguradora en el año 2021, por lo que no reflejan los precios actuales del mercado. Finalmente, solo se consideraron cotizaciones menores a $30,000 pesos.
 
 A continuación, se muestra un ejemplo del tipo de información utilizada:
 
@@ -1332,7 +1334,7 @@ Los municipios de arriba tienen una mayor volatilidad con respecto al resto por 
 
 ## 5.5 Preparación de Modelos
 
-Para la elaboración de los modelos se dividieron los datos en 2 partes:
+Como se dijo en el capítulo 4 para la elaboración de los modelos se dividieron los datos en 2 partes:
 
 + El 80% de los datos se usarán para entrenar el modelo.
 + El 20% de los datos restantes para validarlo.
@@ -1445,8 +1447,8 @@ Finalmente procedemos a hacer un análisis sobre los residuos estimados.
 ```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
 
 plot(predict_model_1, benchmark_validate$QUA_Desc_Num, 
-     xlab = "Valores Estimados (Base Validación)", 
-     ylab = "Valores Reales", xaxt = 'n', yaxt = 'n')
+     xlab = "Precio del Seguro Estimado (Datos de Validación)", 
+     ylab = "Precio del Seguro Observado", xaxt = 'n', yaxt = 'n')
 abline(0,1)
 axis(1, at = pretty(predict_model_1), labels = paste0("$", pretty(predict_model_1)), las = 0.5)
 axis(2, at = pretty(benchmark_validate$QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$QUA_Desc_Num)), las = 0.5) 
@@ -1528,8 +1530,8 @@ Finalmente procedemos a hacer un análisis sobre los residuos estimados.
 
 ```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
 plot(exp(predict_model_1_log), benchmark_validate$QUA_Desc_Num, 
-     xlab = "Valores Estimados (Base Validación)", 
-     ylab = "Valores Reales", xaxt = 'n', yaxt = 'n')
+     xlab = "Precio del Seguro Estimado (Datos de Validación)", 
+     ylab = "Precio del Seguro Observado", xaxt = 'n', yaxt = 'n')
 abline(0,1)
 axis(1, at = pretty(exp(predict_model_1_log)), labels = paste0("$", pretty(exp(predict_model_1_log))), las = 0.5)
 axis(2, at = pretty(benchmark_validate$QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$QUA_Desc_Num)), las = 0.5) 
@@ -1555,7 +1557,7 @@ De las métricas de error se concluye que el modelo con mayor poder predictivo e
 
 ```{r, echo=FALSE, message = FALSE, results = "hide"}
 BIC(model_1_train)
-BIC(model_1_train_log)
+BIC(model_1_train_log)+2*sum(log(benchmark_train$QUA_Desc_Num)) # Ajuste para que sea comparable
 
 ```
 
@@ -1563,7 +1565,7 @@ BIC(model_1_train_log)
 | Modelo                     | CIB       |
 |:--------------------------:|:---------:|
 | Sin Transformación         | 242, 431  |
-| Transformación Logarítmica | -11, 415 |
+| Transformación Logarítmica | 233, 058  |
 Table: Comparativa de Coeficientes de Información
 
 
@@ -1649,8 +1651,8 @@ Finalmente procedemos a hacer un análisis sobre los residuos estimados con los 
 
 ```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
 plot(predict_model_2, benchmark_validate$QUA_Desc_Num, 
-     xlab = "Valores Estimados (Base Validación)", 
-     ylab = "Valores Reales", xaxt = 'n', yaxt = 'n')
+     xlab = "Precio del Seguro Estimado (Datos de Validación)", 
+     ylab = "Precio del Seguro Observado", xaxt = 'n', yaxt = 'n')
 abline(0,1)
 axis(1, at = pretty(predict_model_2), labels = paste0("$", pretty(predict_model_2)), las = 0.5)
 axis(2, at = pretty(benchmark_validate$QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$QUA_Desc_Num)), las = 0.5) 
@@ -1685,6 +1687,8 @@ Table: Análisis de Permanencia de Variables
 
 Procedemos a hacer el análisis post ajuste como se hizo con el Modelo Lineal.
 
+\newpage
+
 ```{r, echo=FALSE, message = FALSE, fig.height=5, fig.width=6, fig.cap = "Análisis de al Ajuste del Modelo Lineal Generalizado"}
 
 # Se divide la tabla
@@ -1692,6 +1696,7 @@ par(mfrow = c(2, 2))
 plot(model_2_train_log)
 
 ```
+
 De las gráficas anteriores se observa que:
 
 + Se observa independencia entre los residuos y las variables explicativas, ya que los residuos no aumentan a medida que lo hacen los valores ajustados. 
@@ -1733,8 +1738,8 @@ Finalmente procedemos a hacer un análisis sobre los residuos estimados del mode
 
 ```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
 plot(exp(predict_model_2_log), benchmark_validate$QUA_Desc_Num, 
-     xlab = "Valores Estimados (Base Validación)", 
-     ylab = "Valores Reales",
+     xlab = "Precio del Seguro Estimado (Datos de Validación)", 
+     ylab = "Precio del Seguro Observado",
      xaxt = 'n', yaxt = 'n') 
 abline(0,1)
 axis(1, at = pretty(exp(predict_model_2_log)), labels = paste0("$", pretty(exp(predict_model_2_log))), las = 0.5)
@@ -2135,7 +2140,7 @@ importance_matrix <- xgb.importance(colnames(dtrain), model = mode_6)
 
 importance <- importance_matrix[1:4]
 
-importance$Nombre <- c("Logaritmo Suma asegurada", "Vehículo de Taller", "Estado de México", "Segmento Camión")
+importance$Nombre <- c("Logaritmo Suma Asegurada", "Vehículo de Taller", "Estado de México", "Segmento Camión")
 
 #xgb.plot.importance(importance_matrix, 
 #                    rel_to_first = FALSE, 
@@ -2164,8 +2169,8 @@ Finalmente, procedemos a hacer un análisis sobre los residuos del modelo de XGr
 ```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Correlación Valores Reales y Estimados"}
 
 plot(exp(predict_model_6), exp(benchmark_validate$Log_QUA_Desc_Num), 
-     xlab = "Valores Estimados (Base Validación)", 
-     ylab = "Valores Reales", xaxt = 'n', yaxt = 'n')
+     xlab = "Precio del Seguro Estimado (Datos de Validación)", 
+     ylab = "Precio del Seguro Observado", xaxt = 'n', yaxt = 'n')
 abline(0,1)
 axis(1, at = pretty(predict_model_6), labels = paste0("$", pretty(predict_model_6)), las = 0.5)
 axis(2, at = pretty(benchmark_validate$Log_QUA_Desc_Num), labels = paste0("$", pretty(benchmark_validate$Log_QUA_Desc_Num)), las = 0.5) 
