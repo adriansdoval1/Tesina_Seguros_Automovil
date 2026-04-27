@@ -3,7 +3,7 @@ title: "Tesina Adrián Sandoval Cordero"
 author: "Adrián Sandoval"
 date: "2026-23-04"
 output: pdf_document
-lang: Es-es
+lang: es-MX
 fig_width: 4 
 fig_height: 3 
 ---
@@ -570,7 +570,7 @@ $$
 Y al substituirla en la función objetivo tenemos que el mínimo valor de la función objetivo en la iteración $t$ es:
 
 $$
-\text{obj}^{(*)}  = -\frac{1}{2}\sum_{j=1}^{T} \frac{G_j^2}{H_j + \lambda} + \gamma T
+\text{obj}^{(*)}  = -\frac{1}{2}\sum_{j=1}^{T} \frac{G_j^2}{H_j + \lambda} + \gamma T^{(t)}
 $$
 
 La expresión anterior evaluada para una $j$ se llama "Score" que se utiliza para evaluar la calidad de una posible división en la estructura del Árbol de Regresión dentro del modelo XGBoost. Durante el proceso de construcción del árbol en la iteración t, esta métrica permite estimar la reducción esperada del error al considerar una variable explicativa $X_i$ como punto de partición. En otras palabras, el "Score" ayuda a determinar qué división produce la mayor ganancia en términos de ajuste del modelo, guiando así la selección óptima de variables y puntos de corte en cada nodo del árbol. Para tener un ajuste más simple se dejó a $\gamma=0$ que es valor predeterminado en la paquetería.
@@ -593,22 +593,23 @@ Aunque una de las principales ventajas del modelo XGBoost es su alta capacidad p
 data(mtcars)
 
 # Convertir a matriz y separar variables
-X <- as.matrix(mtcars[,c(4, 6)])  # Predictores (sin mpg)
-y <- mtcars$mpg               # Variable respuesta
+X_train <- as.matrix(mtcars[,c(4, 6)])  # Predictores (sin mpg)
+y_label <- mtcars$mpg               # Variable respuesta
 
 # Crear estructura de datos para xgboost
-dtrain <- xgb.DMatrix(data = X, label = y)
+dtrain <- xgb.DMatrix(data = X_train, label = y_label)
 
 
 # Entrenar un modelo simple
 modelo <- xgboost(
-  data = dtrain,
+  x = X_train,
+  y = y_label,
   objective = "reg:squarederror",  # Para regresión
-  nrounds = 3,                    # Número de iteraciones
-  verbose = 0,                      # Silencia la salida
-    eta = 0.5, 
+  nrounds = 10,                    # Número de iteraciones
+  verbosity = 0,                      # Silencia la salida
+    learning_rate = 0.5, 
   max_depth = 1,
-  gamma = 0
+  min_split_loss = 0
 )
 
 
@@ -666,13 +667,14 @@ y <- mtcars$mpg                          # Respuesta
 dtrain <- xgb.DMatrix(data = X, label = y)
 
 modelo_xgb <- xgboost(
-  data = dtrain,
+  x = X,
+  y = y,
   objective = "reg:squarederror",
   nrounds = 10,
-  verbose = 0,
-  eta = 0.5, 
+  verbosity = 0,
+  learning_rate = 0.5, 
   max_depth = 1,
-  gamma = 0
+  min_split_loss = 0
 )
 
 # Predicciones con XGBoost
@@ -703,38 +705,38 @@ resultados <- data.frame(
 
 |                    | Real| XGBoost| Árbol de Regresión|
 |:-------------------|----:|-------:|-----:|
-|Mazda RX4           | 21.0|   21.88| 19.79|
-|Mazda RX4 Wag       | 21.0|   21.88| 19.79|
-|Datsun 710          | 22.8|   21.88| 29.03|
-|Hornet 4 Drive      | 21.4|   21.88| 19.79|
-|Hornet Sportabout   | 18.7|   17.62| 19.79|
-|Valiant             | 18.1|   20.61| 19.79|
-|Duster 360          | 14.3|   13.81| 14.28|
-|Merc 240D           | 24.4|   23.73| 19.79|
-|Merc 230            | 22.8|   21.88| 19.79|
-|Merc 280            | 19.2|   17.62| 19.79|
-|Merc 280C           | 17.8|   17.62| 19.79|
-|Merc 450SE          | 16.4|   16.34| 14.28|
-|Merc 450SL          | 17.3|   16.34| 14.28|
-|Merc 450SLC         | 15.2|   16.34| 14.28|
-|Cadillac Fleetwood  | 10.4|   12.89| 14.28|
-|Lincoln Continental | 10.4|   12.89| 14.28|
-|Chrysler Imperial   | 14.7|   12.89| 14.28|
-|Fiat 128            | 32.4|   29.46| 29.03|
-|Honda Civic         | 30.4|   31.32| 29.03|
-|Toyota Corolla      | 33.9|   31.32| 29.03|
-|Toyota Corona       | 21.5|   21.88| 19.79|
-|Dodge Challenger    | 15.5|   16.34| 19.79|
-|AMC Javelin         | 15.2|   17.62| 19.79|
-|Camaro Z28          | 13.3|   13.81| 14.28|
-|Pontiac Firebird    | 19.2|   16.34| 19.79|
-|Fiat X1-9           | 27.3|   29.46| 29.03|
-|Porsche 914-2       | 26.0|   27.62| 29.03|
-|Lotus Europa        | 30.4|   29.48| 29.03|
-|Ford Pantera L      | 15.8|   15.09| 14.28|
-|Ferrari Dino        | 19.7|   17.62| 19.79|
-|Maserati Bora       | 15.0|   13.81| 14.28|
-|Volvo 142E          | 21.4|   21.88| 19.79|
+|Mazda RX4           | 21.0|   21.59| 19.79|
+|Mazda RX4 Wag       | 21.0|   21.59| 19.79|
+|Datsun 710          | 22.8|   22.22| 29.03|
+|Hornet 4 Drive      | 21.4|   21.59| 19.79|
+|Hornet Sportabout   | 18.7|   18.26| 19.79|
+|Valiant             | 18.1|   19.48| 19.79|
+|Duster 360          | 14.3|   14.39| 14.28|
+|Merc 240D           | 24.4|   23.28| 19.79|
+|Merc 230            | 22.8|   21.59| 19.79|
+|Merc 280            | 19.2|   18.26| 19.79|
+|Merc 280C           | 17.8|   18.26| 19.79|
+|Merc 450SE          | 16.4|   16.16| 14.28|
+|Merc 450SL          | 17.3|   16.16| 14.28|
+|Merc 450SLC         | 15.2|   16.16| 14.28|
+|Cadillac Fleetwood  | 10.4|   12.66| 14.28|
+|Lincoln Continental | 10.4|   12.66| 14.28|
+|Chrysler Imperial   | 14.7|   12.66| 14.28|
+|Fiat 128            | 32.4|   29.30| 29.03|
+|Honda Civic         | 30.4|   31.28| 29.03|
+|Toyota Corolla      | 33.9|   31.28| 29.03|
+|Toyota Corona       | 21.5|   21.59| 19.79|
+|Dodge Challenger    | 15.5|   16.16| 19.79|
+|AMC Javelin         | 15.2|   18.26| 19.79|
+|Camaro Z28          | 13.3|   14.39| 14.28|
+|Pontiac Firebird    | 19.2|   16.16| 19.79|
+|Fiat X1-9           | 27.3|   29.30| 29.03|
+|Porsche 914-2       | 26.0|   27.61| 29.03|
+|Lotus Europa        | 30.4|   29.59| 29.03|
+|Ford Pantera L      | 15.8|   16.49| 14.28|
+|Ferrari Dino        | 19.7|   18.26| 19.79|
+|Maserati Bora       | 15.0|   14.39| 14.28|
+|Volvo 142E          | 21.4|   21.59| 19.79|
 Table: Comparación de predicciones: XGBoost contra Árbol de Regresión
 
 Se observa que ambos modelos capturan en términos generales la tendencia de los valores reales; sin embargo, presentan diferencias en la precisión de sus predicciones. En particular, el modelo de XGBoost tiende a ajustarse mejor en ciertos casos. Por ejemplo, para el automóvil Merc 240D, el Árbol de Regresión subestima notablemente el valor real, mientras que XGBoost proporciona una predicción mucho más cercana. Este comportamiento refleja la capacidad de XGBoost para modelar relaciones más complejas entre las variables.
@@ -1848,24 +1850,63 @@ train_grid <- expand.grid(max_depth = 1,
                           min_child_weight = 1,
                           colsample_bytree = 0.6)
 
+x_data <- as.matrix(xg_benchmark_train[, -c("Log_QUA_Desc_Num")])
+
 dtrain_y <- benchmark_train$Log_QUA_Desc_Num
 
 train_control <- trainControl(method = "cv",
                               number = 5,
                               search = "grid")
 
-#model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
+#results <- list()
+
+#for (i in 1:nrow(train_grid)) {
+#   
+#    params <- list(
+#        objective = "reg:squarederror",
+#        eta = train_grid$eta[i],
+#        max_depth = train_grid$max_depth[i],
+#        gamma = train_grid$gamma[i],
+#        subsample = train_grid$subsample[i],
+#        min_child_weight = train_grid$min_child_weight[i],
+#        colsample_bytree = train_grid$colsample_bytree[i]
+#    )
+#
+#    cv <- xgb.cv(
+#        params = params,
+#       data = dtrain,
+#        nrounds = train_grid$nrounds[i],
+#        nfold = 5,
+#        verbose = 0,
+#        early_stopping_rounds = 50,
+#        metrics = "rmse"
+#   )
+#    
+#   results[[i]] <- data.frame(
+#        max_depth = train_grid$max_depth[i],
+#        eta = train_grid$eta[i],
+#        nrounds = train_grid$nrounds[i],
+#        rmse = min(cv$evaluation_log$test_rmse_mean)
+#    )
+    
+#}
+
+#best_index <- which.min(sapply(results, function(x) x$rmse))
+#best_element <- results[[best_index]]
+
+#best_element
 
 # Tarda mucho pero el mejor modelo es
-# RMSE was used to select the optimal model using the smallest value.
-# The final values used for the model were nrounds = 600, max_depth = 3, eta = 0.95, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+# max_depth eta nrounds      rmse
+#         1   1     600 0.1370966
 
 
-mode_6 <- xgboost(data = dtrain, 
-                  verbose = 1, 
-                  nrounds = 600, 
-                  eta = 1, 
-                  max_depth = 1)
+mode_6 <- xgb.train(data = dtrain,
+                    nrounds = 600, 
+                  params = list(verbosity = 0, 
+                                    eta = 1,
+                  gamma = 0,
+                  max_depth = 1))
 
 predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
 
@@ -1894,18 +1935,56 @@ train_control <- trainControl(method = "cv",
                               number = 5,
                               search = "grid")
 
+
+
+#results <- list()
+
+#for (i in 1:nrow(train_grid)) {
+#    
+#    params <- list(
+#        objective = "reg:squarederror",
+#        eta = train_grid$eta[i],
+#        max_depth = train_grid$max_depth[i],
+#        gamma = train_grid$gamma[i],
+#        subsample = train_grid$subsample[i],
+#        min_child_weight = train_grid$min_child_weight[i],
+#        colsample_bytree = train_grid$colsample_bytree[i]
+#    )
+#
+#    cv <- xgb.cv(
+#        params = params,
+#        data = dtrain,
+#        nrounds = train_grid$nrounds[i],
+#        nfold = 5,
+#        verbose = 0,
+#        early_stopping_rounds = 20,
+#        metrics = "rmse"
+#    )
+#    
+#    results[[i]] <- data.frame(
+#        max_depth = train_grid$max_depth[i],
+#        eta = train_grid$eta[i],
+#        nrounds = train_grid$nrounds[i],
+#        rmse = min(cv$evaluation_log$test_rmse_mean)
+#    )
+#    
+#}
+
+#best_index <- which.min(sapply(results, function(x) x$rmse))
+#best_element <- results[[best_index]]
+#best_element
+
 #model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
 
 # Tarda mucho pero el mejor modelo es
-# RMSE was used to select the optimal model using the smallest value.
-# The final values used for the model were nrounds = 600, max_depth = 3, eta = 0.95, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+#   max_depth eta nrounds      rmse
+#         2   1     500 0.1172929
 
-
-mode_6 <- xgboost(data = dtrain, 
-                  verbose = 1, 
+mode_6 <- xgb.train(data = dtrain, 
                   nrounds = 600, 
-                  eta = 0.95, 
-                  max_depth = 2)
+                  params = list(verbose = 0, 
+                  eta = 1, 
+                  max_depth = 2))
 
 predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
 
@@ -1934,18 +2013,55 @@ train_control <- trainControl(method = "cv",
                               number = 5,
                               search = "grid")
 
-#model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
+
+#results <- list()
+
+#for (i in 1:nrow(train_grid)) {
+    
+#    params <- list(
+#        objective = "reg:squarederror",
+#        eta = train_grid$eta[i],
+#        max_depth = train_grid$max_depth[i],
+#        gamma = train_grid$gamma[i],
+#        subsample = train_grid$subsample[i],
+#        min_child_weight = train_grid$min_child_weight[i],
+#        colsample_bytree = train_grid$colsample_bytree[i]
+#    )
+#
+#    cv <- xgb.cv(
+#        params = params,
+#        data = dtrain,
+#        nrounds = train_grid$nrounds[i],
+#        nfold = 5,
+#        verbose = 0,
+#        early_stopping_rounds = 20,
+#        metrics = "rmse"
+#    )
+#    
+#    results[[i]] <- data.frame(
+#        max_depth = train_grid$max_depth[i],
+#        eta = train_grid$eta[i],
+#        nrounds = train_grid$nrounds[i],
+#        rmse = min(cv$evaluation_log$test_rmse_mean)
+#    )
+    
+#}
+
+#best_index <- which.min(sapply(results, function(x) x$rmse))
+#best_element <- results[[best_index]]
+#best_element
+
 
 # Tarda mucho pero el mejor modelo es
-# RMSE was used to select the optimal model using the smallest value.
-# The final values used for the model were nrounds = 600, max_depth = 3, eta = 0.55, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+# max_depth  eta nrounds      rmse
+#         3 0.45     600 0.1110297
 
 
-mode_6 <- xgboost(data = dtrain, 
-                  verbose = 1, 
-                  nrounds = 600, 
-                  eta = 0.55, 
-                  max_depth = 3)
+mode_6 <- xgb.train(data = dtrain,
+                    nrounds = 600, 
+                    params = list(verbose = 0, 
+                    eta = 0.45, 
+                    max_depth = 3))
 
 predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
 
@@ -1975,18 +2091,56 @@ train_control <- trainControl(method = "cv",
                               number = 5,
                               search = "grid")
 
+
+
+#results <- list()
+
+#for (i in 1:nrow(train_grid)) {
+#    
+#    params <- list(
+#        objective = "reg:squarederror",
+#        eta = train_grid$eta[i],
+#        max_depth = train_grid$max_depth[i],
+#        gamma = train_grid$gamma[i],
+#        subsample = train_grid$subsample[i],
+#        min_child_weight = train_grid$min_child_weight[i],
+#        colsample_bytree = train_grid$colsample_bytree[i]
+#    )
+#
+#    cv <- xgb.cv(
+#        params = params,
+#        data = dtrain,
+#        nrounds = train_grid$nrounds[i],
+#        nfold = 5,
+#        verbose = 0,
+#        early_stopping_rounds = 20,
+#        metrics = "rmse"
+#    )
+#    
+#    results[[i]] <- data.frame(
+#        max_depth = train_grid$max_depth[i],
+#        eta = train_grid$eta[i],
+#        nrounds = train_grid$nrounds[i],
+#        rmse = min(cv$evaluation_log$test_rmse_mean)
+#    )
+#    
+#}
+
+#best_index <- which.min(sapply(results, function(x) x$rmse))
+#best_element <- results[[best_index]]
+#best_element
+
 #model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
 
 # Tarda mucho pero el mejor modelo es
-# RMSE was used to select the optimal model using the smallest value.
-# The final values used for the model were nrounds = 600, max_depth = 4, eta = 0.45, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+# max_depth eta nrounds      rmse
+#         4 0.2     600 0.1078889
 
-
-mode_6 <- xgboost(data = dtrain, 
-                  verbose = 1, 
-                  nrounds = 600, 
-                  eta = 0.45, 
-                  max_depth = 4)
+mode_6 <- xgb.train(data = dtrain,
+                    nrounds = 600,  
+                    params = list(verbose = 0, 
+                    eta = 0.2, 
+                    max_depth = 4))
 
 predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
 
@@ -2016,18 +2170,55 @@ train_control <- trainControl(method = "cv",
                               number = 5,
                               search = "grid")
 
-#model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
+
+#results <- list()
+
+#for (i in 1:nrow(train_grid)) {
+    
+#    params <- list(
+#        objective = "reg:squarederror",
+#        eta = train_grid$eta[i],
+#        max_depth = train_grid$max_depth[i],
+#        gamma = train_grid$gamma[i],
+#        subsample = train_grid$subsample[i],
+#        min_child_weight = train_grid$min_child_weight[i],
+#        colsample_bytree = train_grid$colsample_bytree[i]
+#    )
+
+#    cv <- xgb.cv(
+#        params = params,
+#        data = dtrain,
+#        nrounds = train_grid$nrounds[i],
+#        nfold = 5,
+#        verbose = 0,
+#        early_stopping_rounds = 20,
+#        metrics = "rmse"
+#    )
+    
+#    results[[i]] <- data.frame(
+#        max_depth = train_grid$max_depth[i],
+#        eta = train_grid$eta[i],
+#        nrounds = train_grid$nrounds[i],
+#        rmse = min(cv$evaluation_log$test_rmse_mean)
+#    )
+    
+#}
+
+#best_index <- which.min(sapply(results, function(x) x$rmse))
+#best_element <- results[[best_index]]
+#best_element
+
+
 
 # Tarda mucho pero el mejor modelo es
-# RMSE was used to select the optimal model using the smallest value.
-# The final values used for the model were nrounds = 600, max_depth = 5, eta = 0.25, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+# max_depth eta nrounds      rmse
+#         5 0.3     500 0.1071869
 
-
-mode_6 <- xgboost(data = dtrain, 
-                  verbose = 1, 
-                  nrounds = 600, 
-                  eta = 0.25, 
-                  max_depth = 5)
+mode_6 <- xgb.train(data = dtrain,
+                    nrounds = 500,
+                    params = list(verbose = 1, 
+                                  eta = 0.3, 
+                                  max_depth = 5))
 
 predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
 
@@ -2056,18 +2247,56 @@ train_control <- trainControl(method = "cv",
                               number = 5,
                               search = "grid")
 
+
+#results <- list()
+
+#for (i in 1:nrow(train_grid)) {
+#    
+#    params <- list(
+#        objective = "reg:squarederror",
+#        eta = train_grid$eta[i],
+#        max_depth = train_grid$max_depth[i],
+#        gamma = train_grid$gamma[i],
+#        subsample = train_grid$subsample[i],
+#        min_child_weight = train_grid$min_child_weight[i],
+#        colsample_bytree = train_grid$colsample_bytree[i]
+#    )
+#
+#    cv <- xgb.cv(
+#        params = params,
+#        data = dtrain,
+#        nrounds = train_grid$nrounds[i],
+#        nfold = 5,
+#        verbose = 0,
+#        early_stopping_rounds = 20,
+#        metrics = "rmse"
+#    )
+#    
+#    results[[i]] <- data.frame(
+#        max_depth = train_grid$max_depth[i],
+#        eta = train_grid$eta[i],
+#        nrounds = train_grid$nrounds[i],
+#        rmse = min(cv$evaluation_log$test_rmse_mean)
+#    )
+#    
+#}
+
+#best_index <- which.min(sapply(results, function(x) x$rmse))
+#best_element <- results[[best_index]]
+#best_element
+
+
 #model_train <- train(xg_benchmark_train[, -c("Log_QUA_Desc_Num")], dtrain_y, method = "xgbTree", trControl = train_control, tuneGrid = train_grid, verbosity = 0)
 
 # Tarda mucho pero el mejor modelo es
-# RMSE was used to select the optimal model using the smallest value.
-# The final values used for the model were nrounds = 600, max_depth = 6, eta = 0.25, gamma = 0, colsample_bytree = 0.6, min_child_weight = 1 and subsample = 1.
+# max_depth eta nrounds      rmse
+#         6 0.3     400 0.1061497
 
-
-mode_6 <- xgboost(data = dtrain, 
-                  verbose = 1, 
-                  nrounds = 600, 
-                  eta = 0.15, 
-                  max_depth = 6)
+mode_6 <- xgb.train(data = dtrain,
+                    nrounds = 400, 
+                  params = list(verbose = 0, 
+                                eta = 0.3, 
+                                max_depth = 6))
 
 predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
 
@@ -2084,30 +2313,30 @@ eam_model_6_4
 
 La siguiente tabla muestra las métricas de validación variando el parámetro $max\_depth$:
 
-| Parámetro $max\_depth$ | EPAM |  EAM |   ECM  |
-|:---------------------:|:----:|:----:|:------:|
-|           1           | 9.23% | \$930 | $1,647 |
-|           2           | 6.76% | \$677 | $1,304 |
-|           3           | 6.26% | \$620 | $1,247 |
-|           4           | 5.65% | \$556 | $1,174 |
-|           5           | 5.69% | \$553 | $1,121 |
-|           6           | 5.74% | \$558 | $1,149 |
+| Parámetro $max\_depth$| EPAM  |  EAM  |   ECM  |
+|:---------------------:|:-----:|:-----:|:------:|
+|           1           | 9.37% | \$942 | $1,664 |
+|           2           | 7.18% | \$717 | $1,337 |
+|           3           | 6.60% | \$653 | $1,257 |
+|           4           | 6.57% | \$642 | $1,223 |
+|           5           | 5.90% | \$573 | $1,180 |
+|           6           | 5.73% | \$561 | $1,179 |
 Table: Métricas de Validación por Profundidad del Árbol
 
 
-Se concluye que el mejor parámetro para $max\_depth$ es $4$. Además, de acuerdo al resultado de la función $trainControl$ los hiperparámetros que hacen el mejor ajuste de acuerdo al ECM son: 
+Se concluye que el mejor parámetro para $max\_depth$ es $6$. Además, de acuerdo al resultado de la función $trainControl$ los hiperparámetros que hacen el mejor ajuste de acuerdo al ECM son: 
 
 + $nrounds=400$ 
 
-+ $eta=0.34$
++ $eta=0.3$
 
 
 ```{r, echo=FALSE, message = FALSE, results = "hide"}
-mode_6 <- xgboost(data = dtrain, 
-                  verbose = 1, 
-                  nrounds = 600, 
-                  eta = 0.45, 
-                  max_depth = 4)
+mode_6 <- xgb.train(data = dtrain,
+                    nrounds = 400, 
+                  params = list(verbose = 0, 
+                                eta = 0.3, 
+                                max_depth = 6))
 
 predict_model_6 <- predict(mode_6, data.matrix(xg_benchmark_validate[, -c("Log_QUA_Desc_Num")]))
 
@@ -2125,11 +2354,11 @@ Como ya se había mencionado, al estimar el modelo con los parámetros anteriore
 
 | EPAM   | EAM    | ECM    |
 |:------:|:------:|:------:|
-| 5.7% | \$556 | \$1,174 |
+| 5.7% | \$561 | \$1,179 |
 Table: Métrica de Validación
 
 
-De los resultados obtenidos podemos concluir que la metodología de XGradient Boosting se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 5.7% que representa alrededor de $\$556$. Además, el $ECM$ indica que la desviación promedio es $\$1,174$.
+De los resultados obtenidos podemos concluir que la metodología de XGradient Boosting se separa del precio real del seguro de automóvil con cobertura amplia en alrededor del 5.7% que representa alrededor de $\$561$. Además, el $ECM$ indica que la desviación promedio es $\$1,179$.
 
 La paquetería de $xgboost$ de R contiene la función $xgb.importance$ que calcula la importancia de las variables.
 
@@ -2189,13 +2418,14 @@ Como se comentó en capítulos anteriores se hará una comparación de las métr
 |:--------------------------:|:------:|:------:|:------:|
 |      Regresión Lineal      | 11.80% | \$1,136 | \$1,764 |
 | Modelo Lineal Generalizado | 12% | \$1,137 | \$1,757 |
-|     XGradient Boosting     |  5.7% |  \$556 | \$1,174 |
+|     XGradient Boosting     |  5.7% |  \$561 | \$1,179 |
 Table: Comparativa Entre Modelos
 
 De los resultados, se observa que el modelo con el poder predictivo más alto es la técnica de Machine Learning de XGradient Boosting.
 
 Adicionalmente, siguiendo la propuesta de validación del capítulo 4 se hace la comapración visual para cada una de las variables más importantes.
 
+\newpage
 
 ```{r, echo=FALSE, message = FALSE, results = "hide", fig.align = "center", fig.cap = "Validación con la Variable de Suma Asegurada", fig.height = 4, fig.width = 6}
 # Por Variable
@@ -2217,22 +2447,17 @@ df <- benchmark_validate[, .(cotizacion_prom = mean(QUA_Desc_Num),
                              cotizacion_prom_model_2 = mean(model_2),
                              cotizacion_prom_model_2_log = mean(exp(model_2_log)),
                              cotizacion_prom_model_6 = mean(exp(model_6)),
-                             total_datos = .N),by = .(SA_Intervalo_30)]
+                             total_datos = .N),by = .(SA_Intervalo_5)]
 
-label <- as.factor(c("$314-$363",	"$218-$266",	"$266-$314", "$121-$169",	"$508-$557",	
-                            "$169-$218",	"$72-$121",	"$22-$72",	"$363-$411",	"$460-$508",	
-                            "$411-$460",	"$557-$605",	"$750-$799",	"$654-$702",	"$1,138-$1,187",	
-                            "$605-$654",	"$896-$944",	"$702-$750",	"$847-$896",	"$1,090-$1,138",	
-                            "$1,187-$1,235",	"$992-$1,041",	"$944-$993",	"$799-$847",	"$1,235-$1,283",	
-                            "$1,429-$1,478",	"$1,283-$1,331"))
+label <- as.factor(c("$223-$334",	"$334-$644",	"$644-$954", "$954-$1,260",	"$1,260-$1,580"))
 
 
 fig <- ggplot(df) + 
-  geom_col(aes(x = as.factor(SA_Intervalo_30), y = total_datos * 1)) + 
-  geom_line(aes(x = as.factor(SA_Intervalo_30), y = cotizacion_prom / 100, colour="Precio Real"), group = 2) +
-  geom_line(aes(x = as.factor(SA_Intervalo_30), y = cotizacion_prom_model_1_log / 100, colour="Modelo Log-Lineal"), group = 2) +
-  geom_line(aes(x = as.factor(SA_Intervalo_30), y = cotizacion_prom_model_2_log / 100, colour="MLG Log-Lineal"), group = 2) +
-  geom_line(aes(x = as.factor(SA_Intervalo_30), y = cotizacion_prom_model_6 / 100, colour="XGBoost"), group = 2) +
+  geom_col(aes(x = as.factor(SA_Intervalo_5), y = total_datos * 1)) + 
+  geom_line(aes(x = as.factor(SA_Intervalo_5), y = cotizacion_prom / 10, colour="Precio Real"), group = 2) +
+  geom_line(aes(x = as.factor(SA_Intervalo_5), y = cotizacion_prom_model_1_log / 10, colour="Modelo Log-Lineal"), group = 2) +
+  geom_line(aes(x = as.factor(SA_Intervalo_5), y = cotizacion_prom_model_2_log / 10, colour="MLG Log-Lineal"), group = 2) +
+  geom_line(aes(x = as.factor(SA_Intervalo_5), y = cotizacion_prom_model_6 / 10, colour="XGBoost"), group = 2) +
   scale_color_manual(name = "", values = c("Precio Real" = "black",
                                            "Modelo Log-Lineal" = "blue",
                                            "MLG Log-Lineal" = "red",
@@ -2245,7 +2470,7 @@ fig
 
 ```
 
-Para la Suma Asegurada con 30 intervalos se obseva como todos los modelos tienen un ajuste adecuado para los primeros intervalos. Sin embargo, para los valores más altos como el intervalo \$1,187-\$1,235 de Suma Asegurada donde no hay muchos datos se observa que la predicción usando la técnica de Machine Learning es más precisa que las metodologías tradicionales. Sin embargo, en la penúltima categoría de Suma Aseguradas más altas donde el Modelo Lineal fué más preciso de manera más significativa pero sólo se debe al bajo número de cotizaciones. Observando la Suma aSegurada se observa que en general todos los modelos tuvieron un valor predictivo similar.
+Para la Suma Asegurada con 5 intervalos se obseva que el modelo de *XGradient Boosting* tiene un mejor ajuste para los primeros tres intervalos. Sin embargo, para los valores más altos como el intervalo \$954-\$1,260 de Suma Asegurada donde no hay muchos datos se observa que la predicción usando el modelo de *XGradient Boosting* es igual de precisa que las metodología del MLG Log-Lineal, pero en el último intervalo donde esta última falla se observa que el Modelo Log-Lineal y el modelo de *XGradient Boosting* tienen comportamiento similar. De este análisis visual de la Suma Asegurada podemos concluir que el modelo de *XGradient Boosting* tiene mejor ajuste.
 
 
 ```{r, echo=FALSE, message = FALSE, fig.cap = "Variable Municipio (mayor a 50 cotizaciones)", fig.height = 4, fig.width = 6}
@@ -2277,6 +2502,7 @@ fig <- ggplot(df) +
 fig
 ```
 
+\newpage
 
 Para esta variable, se realizó un análisis gráfico considerando únicamente los municipios con más de 50 cotizaciones, lo que permite una mejor visualización de los resultados. No obstante, más adelante se presenta un análisis de métricas que incluye al resto de los municipios.
 
@@ -2333,11 +2559,11 @@ nrow(benchmark_validate[Municipio_D %in% ref])
 |:--------------------------:|:------:|:------:|:------:|
 |      Regresión Lineal      | 14.25% | \$1,288 | \$1,909 |
 | Modelo Lineal Generalizado | 14.76% | \$1,296 | \$1,892 |
-|     XGradient Boosting     | 9.4% | \$827 | \$1,352 |
+|     XGradient Boosting     | 10.76% | \$943 | \$1,442 |
 Table: Comparativa Entre Modelos por Municipio
 
 
-De acuerdo a las métricas de arriba el modelo con mejor estimación es el modelo de XGradient Boosting al reducir todas las métricas de error. Por lo tanto se tiene una mejor predicción por parte del modelo de XGradient Boosting.
+De acuerdo a las métricas de arriba el modelo con mejor estimación es el modelo de XGradient Boosting al reducir todas las métricas de error. Por lo tanto se tiene una mejor predicción por parte del modelo de *XGradient Boosting*.
 
 De la validación gráfica se concluye que a un nivel Municipio el modelo XGradient Boosting representa una mejora significativa respecto a las otras metodologías tradicionales; además, la variable Municipio es una variable que identifica la zona por lo que la mejora observada es importante.  
 
@@ -2371,7 +2597,7 @@ fig
 
 \newpage
 
-Cuando se hace la comparación por Marca se observa que en general todos los modelos siguen el comportamiento del Precio del Seguro. Sin embargo, existen algunas categorías donde el comportamiento de XGradient Boosting es más parecido al Precio Real que el resto de modelos, por ejemplo para la marca ACURA, Porsche, Seat y HINO MOTORS se observa una mejora significativa respecto al resto de modelos. Sin embargo, para la categoría de LAND ROVER el modelo con mayor error es XGradient Boosting, pero su error no es muy diferente comparado al resto de modelos. De la gráfica se concluye que el modelo con mejor predicción es XGradient Boosting. Sin embargo, para esta variable todos los modelos tienen una predicción cercana al valor real.
+Cuando se hace la comparación por Marca se observa que en general todos los modelos siguen el comportamiento del Precio del Seguro. Sin embargo, existen algunas categorías donde el comportamiento de *XGradient Boosting* es más parecido al Precio Real que el resto de modelos, por ejemplo para la marca ACURA, Porsche, Seat y HINO MOTORS se observa una mejora significativa respecto al resto de modelos. Sin embargo, para la categoría de LAND ROVER el modelo con mayor error es XGradient Boosting, pero su error no es muy diferente comparado al resto de modelos. De la gráfica se concluye que el modelo con mejor predicción es XGradient Boosting. Sin embargo, para esta variable todos los modelos tienen una predicción cercana al valor real.
 
 Aunque esta comparación visual no es definitiva, se observa que el modelo de XGradient Boosting ofrece mejores resultados a un nivel desagregado. 
 
@@ -2548,7 +2774,9 @@ plot_grid(
 
 ```
 
-De las gráficas de cuantiles anteriores se observa que todos los modelos están cerca al valor real y crecen de la misma forma. Sin embargo, el primer y último decil del Modelo Lineal se separan del valor real, y el sexto decil del gráfico de cuantiles del Modelo Lineal Generalizado existe una separación significativa. Pero, para el modelo de XGradient Boosting no se observa una separación por lo que el este modelo parece predecir de forma más precisa los valores reales. Finalmente, el “lift” del modelo de XGradient Boosting es mayor que el resto de los modelos, es decir la metodología de Machine Learning identifica mejor los valores más grandes y mínimos del precio real, por lo que el modelo con mejores características predictivas es el modelo de XGradient Boosting.
+\newpage
+
+De las gráficas de cuantiles anteriores se observa que todos los modelos están cerca al valor real y crecen de la misma forma. Sin embargo, el primer y último decil del Modelo Lineal se separan del valor real, y el sexto decil del gráfico de cuantiles del Modelo Lineal Generalizado existe una separación significativa. Pero, para el modelo de XGradient Boosting no se observa una separación por lo que el este modelo parece predecir de forma más precisa los valores reales. Finalmente, el “lift” del modelo de XGradient Boosting es mayor que el resto de los modelos, es decir la metodología de *Machine Learning* identifica mejor los valores más grandes y mínimos del precio real, por lo que el modelo con mejores características predictivas es el modelo de XGradient Boosting.
 
 A partir de los resultados de las métricas de validación, la comparación visual por categoría y los gráficos de cuantiles, se concluye que el modelo con mejor desempeño predictivo es XGBoost. Este resultado se atribuye principalmente a la alta número de variables explicativas categóricas en los datos.
 
