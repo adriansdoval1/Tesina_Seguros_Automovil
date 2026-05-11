@@ -3,20 +3,37 @@
 #author: "Adrián Sandoval"
 #date: "2026-23-04"
 output: 
-  pdf_document:
-    toc: true
-    includes:
-      before_body: Formato-Portada-ESPECIALIDAD_ASC.docx
+  pdf_document
 lang: es-MX
 fig_width: 4 
 fig_height: 3 
 ---
+\thispagestyle{empty}
+```{r cover1, echo=FALSE, out.width='100%', fig.align='left'}
+knitr::include_graphics("Formato-Portada-ESPECIALIDAD_ASC1.pdf")
+```
+
+\thispagestyle{empty}
+```{r cover2, echo=FALSE, out.width='100%', fig.align='left'}
+knitr::include_graphics("Formato-Portada-ESPECIALIDAD_ASC2.pdf")
+```
+
+\thispagestyle{empty}
+```{r cover3, echo=FALSE, out.width='100%', fig.align='left'}
+knitr::include_graphics("Formato-Portada-ESPECIALIDAD_ASC_3.pdf")
+```
+
+\newpage
+\thispagestyle{empty}
 \tableofcontents 
 \newpage
+\thispagestyle{empty}
 \listoffigures
 \newpage
+\thispagestyle{empty}
 \listoftables
 \newpage
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=FALSE, fig.height=3, fig.width=4)
@@ -109,6 +126,9 @@ benchmark_model <- benchmark_model[Estado %!in% c("Baja California Sur", "Campec
 
 #nrow(benchmark_model)
 ```
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
 
 # 1. Introducción
 
